@@ -30,7 +30,8 @@ impl NotebookStorage {
         let mut contents = String::new();
 
         if decoder.read_to_string(&mut contents).is_ok() {
-            let notebook: Notebook = serde_json::from_str(&contents)
+            let clean = contents.trim_start_matches('\u{feff}');
+            let notebook: Notebook = serde_json::from_str(clean)
                 .map_err(|e| format!("Invalid notebook JSON: {}", e))?;
             return Ok(notebook);
         }
@@ -40,7 +41,8 @@ impl NotebookStorage {
         let mut raw_reader = std::io::BufReader::new(raw_file);
         let mut raw_contents = String::new();
         raw_reader.read_to_string(&mut raw_contents).map_err(|e| format!("Read failed: {}", e))?;
-        let notebook: Notebook = serde_json::from_str(&raw_contents)
+        let clean_raw = raw_contents.trim_start_matches('\u{feff}');
+        let notebook: Notebook = serde_json::from_str(clean_raw)
             .map_err(|e| format!("Invalid notebook format: {}", e))?;
 
         Ok(notebook)

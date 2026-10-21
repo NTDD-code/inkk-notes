@@ -10,31 +10,79 @@ use crate::model::{PenType, Point};
 
 const PI: f32 = std::f32::consts::PI;
 
-// --- One-Euro filter tuning (Tuned for ultra-low latency & natural fluidity) ---
-// Tăng MIN_CUTOFF lên 1.15 Hz và BETA lên 0.035 để ngòi bút bám sát tức thì vào con trỏ,
-// triệt tiêu độ trễ kéo lê, giúp đuôi bút ngắn và phản hồi nhanh như DirectInk.
-const ONE_EURO_MIN_CUTOFF: f32 = 1.15;
-const ONE_EURO_BETA: f32 = 0.035;
-const ONE_EURO_DCUTOFF: f32 = 1.2;
+// --- One-Euro filter tuning (AGGRESSIVE - Native feel like Scribble Ink) ---
+// CỰC KỲ AGGRESSIVE: MIN_CUTOFF 2.2 Hz, BETA 0.07 - BÁM SÁT con trỏ, ZERO LAG!
+// Chỉ lọc rung nhẹ nhưng GIỮ NGUYÊN mọi chuyển động thật → cảm giác NATIVE!
+const ONE_EURO_MIN_CUTOFF: f32 = 2.2;
+const ONE_EURO_BETA: f32 = 0.07;
+const ONE_EURO_DCUTOFF: f32 = 0.8;
 
 // --- Corner protection (base at 96 DPI / 100% scale) ---
-// Góc quẹo thật (> 120 độ) mới kích hoạt boost làm sắc góc, bảo vệ đường tròn không bị gãy
-const CORNER_MIN_DIST_BASE: f32 = 2.8;
-const CORNER_COS_THRESHOLD: f32 = -0.50;
-const CORNER_CUTOFF_BOOST: f32 = 2.5;
+// Góc quẹo thật (> 115 độ) mới kích hoạt boost, bảo vệ đường tròn và số 0, 2, 3 mượt mà
+const CORNER_MIN_DIST_BASE: f32 = 2.4;
+const CORNER_COS_THRESHOLD: f32 = -0.42;
+const CORNER_CUTOFF_BOOST: f32 = 3.2;
 
 // --- Decimation (base at 96 DPI / 100% scale) ---
-// Lấy mẫu mật độ dày (0.35 px tương đương Windows DirectInk và C++ INKK 0.25 px)
-// giúp đường cong mịn như lụa, không bị cứng hay giật đốt pixel
-const DECIMATE_MIN_DIST_BASE: f32 = 0.35;
-const DECIMATE_SPEED_SLOPE_BASE: f32 = 0.65;
+// Thưa hơn (0.45 px) để nét GÓC CẠNH rõ ràng, CRISP như native, không bị tròn ủng
+const DECIMATE_MIN_DIST_BASE: f32 = 0.45;
+const DECIMATE_SPEED_SLOPE_BASE: f32 = 0.75;
 
 // --- Speed normalization reference (base at 96 DPI) ---
-const SPEED_REFERENCE_BASE: f32 = 950.0;
+const SPEED_REFERENCE_BASE: f32 = 1100.0;
 
 // dt clamps (seconds)
 const DT_MIN: f32 = 1.0 / 500.0; // 2ms
 const DT_MAX: f32 = 1.0 / 20.0; // 50ms (stalled gap)
+
+// --- Pressure response (Windows DirectInk-style) ---
+// Cảm biến bút trả về P tuyến tính 0..1 nhưng cảm giác viết tự nhiên cần P^gamma.
+// gamma < 1 => chạm nhẹ (P nhỏ) vẫn cho nét dày ngay, tránh nét "sợi chỉ" rồi bung dần.
+pub const PRESSURE_GAMMA: f32 = 0.5;
+
+/// Lọc rung lực nhấn (low-pass) + nén gamma — mô phỏng đường cong cảm nhận của DirectInk.
+#[derive(Debug, Clone)]
+pub struct PressureModel {
+    last_smoothed_p: f32,
+    /// Trọng số EMA: nhỏ = mượt hơn nhưng lag hơn
+    alpha: f32,
+}
+
+impl Default for PressureModel {
+    fn default() -> Self {
+        Self {
+            last_smoothed_p: 0.5,
+            alpha: 0.45,
+        }
+    }
+}
+
+impl PressureModel {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn reset(&mut self, raw_pressure: f32) {
+        self.last_smoothed_p = raw_pressure.clamp(0.0, 1.0);
+    }
+
+    /// Trả về lực đã lọc rung (chưa áp gamma).
+    pub fn filter(&mut self, raw_pressure: f32) -> f32 {
+        let raw = raw_pressure.clamp(0.0, 1.0);
+        let smoothed = self.alpha * raw + (1.0 - self.alpha) * self.last_smoothed_p;
+        self.last_smoothed_p = smoothed;
+        smoothed
+    }
+
+    pub fn smoothed(&self) -> f32 {
+        self.last_smoothed_p
+    }
+}
+
+/// Nén gamma của lực nhấn: ánh xạ lực tuyến tính của cảm biến sang cảm giác viết tự nhiên.
+pub fn pressure_curve(pressure: f32) -> f32 {
+    pressure.clamp(0.0, 1.0).powf(PRESSURE_GAMMA)
+}
 
 #[inline]
 fn lowpass_alpha(cutoff_hz: f32, dt: f32) -> f32 {
@@ -46,39 +94,42 @@ fn lowpass_alpha(cutoff_hz: f32, dt: f32) -> f32 {
 }
 
 /// Dynamic thickness based on pen physics model (Chỉnh mềm mại, tự nhiên, đỡ cứng)
-/// Lấy cảm hứng từ phân tích Scrble Ink & C++ INKK PenDynamics
+/// Lấy cảm hứng từ phân tích Scrble Ink & C++ INKK PenDynamics + DirectInk curves.
+///
+/// **pressure_curve** đã được áp ở ngoài (đã qua gamma), nhận vào đây là lực cong.
 pub fn compute_thickness(
     pen_type: PenType,
     base_thickness: f32,
     speed_factor: f32,
-    pressure: f32,
+    pressure_curve: f32,
 ) -> f32 {
-    let p = pressure.clamp(0.05, 1.0);
+    let p = pressure_curve.clamp(0.0, 1.0);
+    // Scale nét theo Scrble Ink: min_scale + range * p
     match pen_type {
         PenType::Ballpoint => {
-            // Bút bi: biến thiên êm dịu, không gắt (vFactor 0.90x ~ 1.08x, pFactor 0.85x ~ 1.15x)
-            let v_factor = 1.08 - speed_factor * 0.20;
-            let p_factor = 0.85 + p * 0.30;
-            (base_thickness * v_factor * p_factor).max(0.7)
+            // Bút bi: [0.25 .. 1.75] theo đường cong lực
+            let v_factor = 1.08 - speed_factor * 0.18;
+            let scale = 0.25 + (1.75 - 0.25) * p;
+            (base_thickness * scale * v_factor).max(0.7)
         }
         PenType::Fountain => {
-            // Bút máy: Mềm mại, nét thanh nét đậm tự nhiên nhưng không bị thắt đột ngột (đỡ cứng)
-            let v_factor = 1.20 - speed_factor * 0.40;
-            let p_factor = 0.75 + p * 0.50;
-            (base_thickness * v_factor * p_factor).max(0.6)
+            // Bút máy: [0.20 .. 1.80] biến thiên mạnh hơn
+            let v_factor = 1.18 - speed_factor * 0.35;
+            let scale = 0.20 + (1.80 - 0.20) * p;
+            (base_thickness * scale * v_factor).max(0.6)
         }
         PenType::Pencil => {
-            // Bút chì: Nét đều, cảm giác nhám nhẹ
-            let v_factor = 1.06 - speed_factor * 0.18;
-            let p_factor = 0.78 + p * 0.35;
-            (base_thickness * v_factor * p_factor).max(0.6)
+            // Bút chì: [0.25 .. 1.60] đều hơn
+            let v_factor = 1.05 - speed_factor * 0.16;
+            let scale = 0.25 + (1.60 - 0.25) * p;
+            (base_thickness * scale * v_factor).max(0.6)
         }
         PenType::Highlighter => base_thickness,
         PenType::Calligraphy => {
-            // Bút thư pháp: Vát mềm mại, phối hợp áp lực và tốc độ
-            let v_factor = 1.16 - speed_factor * 0.32;
-            let p_factor = 0.78 + p * 0.44;
-            (base_thickness * v_factor * p_factor).max(0.8)
+            // Bút thư pháp: [0.22 .. 1.75]
+            let v_factor = 1.14 - speed_factor * 0.30;
+            let scale = 0.22 + (1.75 - 0.22) * p;
+            (base_thickness * scale * v_factor).max(0.8)
         }
     }
 }
@@ -97,7 +148,7 @@ pub struct StabilizerPipeline {
     prev_dir_y: f32,
     last_emit_x: f32,
     last_emit_y: f32,
-    smooth_pressure: f32,
+    pressure_model: PressureModel,
     prev_speed: f32,
     is_initialized: bool,
     last_timestamp_sec: f64,
@@ -117,7 +168,7 @@ impl Default for StabilizerPipeline {
             prev_dir_y: 0.0,
             last_emit_x: 0.0,
             last_emit_y: 0.0,
-            smooth_pressure: 0.5,
+            pressure_model: PressureModel::new(),
             prev_speed: 0.0,
             is_initialized: false,
             last_timestamp_sec: -1.0,
@@ -151,7 +202,7 @@ impl StabilizerPipeline {
         self.prev_dir_y = 0.0;
         self.last_emit_x = start_x;
         self.last_emit_y = start_y;
-        self.smooth_pressure = start_pressure;
+        self.pressure_model.reset(start_pressure);
         self.prev_speed = 0.0;
         self.is_initialized = true;
         self.last_timestamp_sec = -1.0;
@@ -172,7 +223,12 @@ impl StabilizerPipeline {
         if !self.is_initialized {
             self.reset(raw_x, raw_y, raw_pressure);
             self.last_timestamp_sec = timestamp_sec;
-            let thickness = compute_thickness(pen_type, base_thickness, 0.0, raw_pressure);
+            let thickness = compute_thickness(
+                pen_type,
+                base_thickness,
+                0.0,
+                pressure_curve(raw_pressure),
+            );
             return Some(Point::with_thickness(raw_x, raw_y, raw_pressure, thickness));
         }
 
@@ -231,8 +287,9 @@ impl StabilizerPipeline {
         self.filtered_x = a * raw_x + (1.0 - a) * self.filtered_x;
         self.filtered_y = a * raw_y + (1.0 - a) * self.filtered_y;
 
-        // --- PRESSURE: light single-pass smoothing ---
-        self.smooth_pressure = 0.35 * raw_pressure + 0.65 * self.smooth_pressure;
+        // --- PRESSURE: Lọc rung (EMA) + nén gamma (DirectInk-style response) ---
+        let smoothed_pressure = self.pressure_model.filter(raw_pressure);
+        let curved_pressure = pressure_curve(smoothed_pressure);
         self.prev_speed = speed;
         let speed_factor = (speed / speed_reference).min(1.0);
 
@@ -243,13 +300,13 @@ impl StabilizerPipeline {
 
         if dx * dx + dy * dy > min_dist * min_dist || corner_boost > 1.0 {
             let dynamic_thickness =
-                compute_thickness(pen_type, base_thickness, speed_factor, self.smooth_pressure);
+                compute_thickness(pen_type, base_thickness, speed_factor, curved_pressure);
             self.last_emit_x = self.filtered_x;
             self.last_emit_y = self.filtered_y;
             Some(Point::with_thickness(
                 self.filtered_x,
                 self.filtered_y,
-                self.smooth_pressure,
+                smoothed_pressure, // point giữ lực gốc để render/serialize, thickness đã qua gamma
                 dynamic_thickness,
             ))
         } else {
@@ -265,16 +322,17 @@ impl StabilizerPipeline {
 
         let fdx = self.prev_raw_x - self.last_emit_x;
         let fdy = self.prev_raw_y - self.last_emit_y;
-        let flush_thresh = 0.2 * self.dpi_scale;
+        let flush_thresh = 0.15 * self.dpi_scale;
         if fdx * fdx + fdy * fdy > flush_thresh * flush_thresh {
-            let dynamic_thickness =
-                compute_thickness(pen_type, base_thickness, 0.0, self.smooth_pressure);
+            let smoothed_p = self.pressure_model.smoothed();
+            let curved_p = pressure_curve(smoothed_p);
+            let dynamic_thickness = compute_thickness(pen_type, base_thickness, 0.0, curved_p);
             self.last_emit_x = self.prev_raw_x;
             self.last_emit_y = self.prev_raw_y;
             Some(Point::with_thickness(
                 self.prev_raw_x,
                 self.prev_raw_y,
-                self.smooth_pressure,
+                smoothed_p,
                 dynamic_thickness,
             ))
         } else {
@@ -289,6 +347,6 @@ impl StabilizerPipeline {
 
     #[allow(dead_code)]
     pub fn current_pressure(&self) -> f32 {
-        self.smooth_pressure
+        self.pressure_model.smoothed()
     }
 }

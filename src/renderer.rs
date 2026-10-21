@@ -170,10 +170,8 @@ impl NoteRenderer {
         page_painter.line_segment([bottom_p1, bottom_p2], Stroke::new(1.0_f32, ind_color));
     }
 
-    /// Mathematical Centripetal Catmull-Rom to Cubic Bezier curve interpolator
-    /// (Faithful translation of C++ StrokeAlgorithm::Geometry::BuildCatmullRomSpline)
-    /// Mathematical curve smoothing (Chaikin Corner Smoothing + Centripetal Catmull-Rom)
-    /// Đảm bảo đường cong lượn tròn hoàn hảo khi vẽ bằng chuột (loại bỏ hiện tượng gập khúc, ziczac số 0, số 2, số 3)
+    /// Mathematical curve smoothing - BALANCED for Native + Smooth
+    /// Đủ mượt để loại jitter nhưng GIỮ độ CRISP, SNAPPY như Scribble Ink
     fn generate_smooth_polyline<F>(pts: &[Point], to_screen: &F) -> Vec<(Pos2, f32, f32)>
     where
         F: Fn(Pos2) -> Pos2,
@@ -182,14 +180,14 @@ impl NoteRenderer {
             return Vec::new();
         }
 
-        // BƯỚC 1: Lọc bỏ các điểm trùng hoặc quá gần nhau (< 1.0 screen pixel)
+        // BƯỚC 1: Lọc điểm trùng (< 0.9 screen pixel - không quá sát)
         let mut screen_pts: Vec<(Pos2, f32, f32)> = Vec::with_capacity(pts.len());
         for p in pts {
             let sp = to_screen(Pos2::new(p.x, p.y));
             let pres = p.pressure.clamp(0.05, 1.0);
             let th = p.thickness;
             if let Some(&(last_pos, _, _)) = screen_pts.last() {
-                if (sp.x - last_pos.x).powi(2) + (sp.y - last_pos.y).powi(2) >= 1.0 {
+                if (sp.x - last_pos.x).powi(2) + (sp.y - last_pos.y).powi(2) >= 0.81 {
                     screen_pts.push((sp, pres, th));
                 }
             } else {
@@ -206,7 +204,7 @@ impl NoteRenderer {
             let (p1, pres1, th1) = screen_pts[0];
             let (p2, pres2, th2) = screen_pts[1];
             let dist = p1.distance(p2);
-            let steps = ((dist / 1.5).ceil() as usize).clamp(2, 16);
+            let steps = ((dist / 1.5).ceil() as usize).clamp(2, 12);
             let mut smooth = Vec::with_capacity(steps + 1);
             for s in 0..=steps {
                 let t = s as f32 / steps as f32;
@@ -218,13 +216,11 @@ impl NoteRenderer {
             return smooth;
         }
 
-        // BƯỚC 2: Midpoint Quadratic Bezier Spline (Chuẩn mượt của INKK C++ & OneNote)
-        // Đường cong đi qua các trung điểm (midpoint) và dùng điểm mẫu làm control point,
-        // triệt tiêu 100% các góc nhọn giả do click/di chuột tạo ra!
-        let mut smooth = Vec::with_capacity(n * 8);
+        // BƯỚC 2: Midpoint Quadratic Bezier - ÍT STEPS hơn để CRISP
+        let mut smooth = Vec::with_capacity(n * 6);
         smooth.push(screen_pts[0]);
 
-        // Đoạn đầu tiên: P0 nối tới Mid(P0, P1)
+        // Đoạn đầu
         let mid0 = Pos2::new(
             (screen_pts[0].0.x + screen_pts[1].0.x) * 0.5,
             (screen_pts[0].0.y + screen_pts[1].0.y) * 0.5,
@@ -233,7 +229,7 @@ impl NoteRenderer {
         let mid_th0 = (screen_pts[0].2 + screen_pts[1].2) * 0.5;
 
         let dist0 = screen_pts[0].0.distance(mid0);
-        let steps0 = ((dist0 / 1.5).ceil() as usize).clamp(2, 8);
+        let steps0 = ((dist0 / 1.8).ceil() as usize).clamp(2, 6);
         for s in 1..=steps0 {
             let t = s as f32 / steps0 as f32;
             let pt = Pos2::new(
@@ -245,7 +241,7 @@ impl NoteRenderer {
             smooth.push((pt, pres, th));
         }
 
-        // Các đoạn thân nét: uốn lượn liên tục Quadratic Bezier từ Mid[i-1] -> Mid[i] với Control Point là P[i]
+        // Các đoạn thân - ÍT STEPS (1.2px spacing) để nét CRISP
         for i in 1..n - 1 {
             let p_prev = screen_pts[i - 1];
             let p_curr = screen_pts[i];
@@ -261,13 +257,13 @@ impl NoteRenderer {
             let end_th = (p_curr.2 + p_next.2) * 0.5;
 
             let chord = start_mid.distance(end_mid);
-            let steps = ((chord / 1.0).ceil() as usize).clamp(3, 28);
+            // ÍT STEPS hơn - spacing 1.2px thay vì 0.8px
+            let steps = ((chord / 1.2).ceil() as usize).clamp(3, 20);
 
             for s in 1..=steps {
                 let t = s as f32 / steps as f32;
                 let omt = 1.0 - t;
 
-                // Quadratic Bezier: (1-t)^2 * start + 2*(1-t)*t * ctrl + t^2 * end
                 let x = omt * omt * start_mid.x + 2.0 * omt * t * p_curr.0.x + t * t * end_mid.x;
                 let y = omt * omt * start_mid.y + 2.0 * omt * t * p_curr.0.y + t * t * end_mid.y;
 
@@ -285,12 +281,12 @@ impl NoteRenderer {
             }
         }
 
-        // Đoạn cuối cùng: từ Mid cuối tới P[n-1]
+        // Đoạn cuối
         let p_last = screen_pts[n - 1];
         let p_penult = screen_pts[n - 2];
         let last_mid = Pos2::new((p_penult.0.x + p_last.0.x) * 0.5, (p_penult.0.y + p_last.0.y) * 0.5);
         let dist_end = last_mid.distance(p_last.0);
-        let steps_end = ((dist_end / 1.5).ceil() as usize).clamp(2, 8);
+        let steps_end = ((dist_end / 1.8).ceil() as usize).clamp(2, 6);
         for s in 1..=steps_end {
             let t = s as f32 / steps_end as f32;
             let pt = Pos2::new(
@@ -458,9 +454,8 @@ impl NoteRenderer {
         }
     }
 
-    /// === ELASTIC TAIL (Port từ C++ Renderer.cpp & tinh chỉnh đuôi ngắn gọn, thanh thoát) ===
-    /// "Sticks" ink to mouse. Triệt tiêu 100% cảm giác trễ (lag),
-    /// gắn một đoạn cong đàn hồi ngắn mềm mại vào đầu ngòi chuột trong thời gian thực.
+    /// === ELASTIC TAIL - NATIVE CRISP FEEL ===
+    /// Đuôi CỰC NGẮN, THẲNG, BÁM SÁT như DirectInk - ZERO LAG!
     pub fn render_elastic_tail<F>(
         painter: &Painter,
         stroke: &NoteStroke,
@@ -483,27 +478,29 @@ impl NoteRenderer {
         let dx = raw.x - end.x;
         let dy = raw.y - end.y;
         let dist = (dx * dx + dy * dy).sqrt();
-        if dist > 0.6 {
-            // Giới hạn chiều dài đuôi ngắn hơn hẳn (max 12px), không bị kéo lê dài
-            let max_tail = 12.0 * scale.clamp(0.8, 1.3);
+
+        // Ngưỡng CỰC THẤP (0.3px) - vẽ ngay lập tức
+        if dist > 0.3 {
+            // Đuôi CỰC NGẮN (max 5px) - gần như thẳng tới con trỏ
+            let max_tail = 5.0 * scale.clamp(0.8, 1.1);
             let target_raw = if dist > max_tail {
                 Pos2::new(end.x + (dx / dist) * max_tail, end.y + (dy / dist) * max_tail)
             } else {
                 raw
             };
 
-            // Control point: Phóng tiếp tuyến nhẹ từ đoạn cuối ra phía trước (20% strength)
+            // Control point: CỰC NHẸ (5% strength) - gần như đường thẳng
             let ctrl = if n >= 2 {
                 let p_penult = to_screen(Pos2::new(pts[n - 2].x, pts[n - 2].y));
                 let vx = end.x - p_penult.x;
                 let vy = end.y - p_penult.y;
-                Pos2::new(end.x + vx * 0.20, end.y + vy * 0.20)
+                Pos2::new(end.x + vx * 0.05, end.y + vy * 0.05)
             } else {
                 end
             };
 
-            // Vẽ đường nối cong Quadratic Bezier ngắn, vuốt mảnh dần về phía con trỏ
-            let steps = 6;
+            // Đường nối THẲNG, ít steps (4) để crisp
+            let steps = 4;
             let mut tail_pts = Vec::with_capacity(steps + 1);
             for s in 0..=steps {
                 let t = s as f32 / steps as f32;
@@ -522,12 +519,12 @@ impl NoteRenderer {
             );
 
             let th = if last_pt.thickness > 0.01 {
-                (last_pt.thickness * scale * 0.75).max(1.0)
+                (last_pt.thickness * scale * 0.88).max(0.8)
             } else {
-                (stroke.size * scale * 0.70).max(1.0)
+                (stroke.size * scale * 0.85).max(0.8)
             };
 
-            // Nối nét thanh mảnh, không vẽ đốm tròn thừa ở đầu trỏ để đuôi cực kỳ gọn gàng
+            // Nối nét CRISP
             painter.add(egui::Shape::line(tail_pts, Stroke::new(th, color)));
         }
     }

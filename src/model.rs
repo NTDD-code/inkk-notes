@@ -1,16 +1,37 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
     pub pressure: f32,
-    #[serde(default = "default_point_thickness")]
     pub thickness: f32,
 }
 
-fn default_point_thickness() -> f32 {
-    0.0
+impl<'de> Deserialize<'de> for Point {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let val = serde_json::Value::deserialize(deserializer)?;
+        match val {
+            serde_json::Value::Object(map) => {
+                let x = map.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let y = map.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let pressure = map.get("pressure").and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
+                let thickness = map.get("thickness").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                Ok(Point { x, y, pressure, thickness })
+            }
+            serde_json::Value::Array(arr) => {
+                let x = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let y = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let pressure = arr.get(2).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
+                let thickness = arr.get(3).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                Ok(Point { x, y, pressure, thickness })
+            }
+            _ => Ok(Point::new(0.0, 0.0, 1.0)),
+        }
+    }
 }
 
 impl Point {
@@ -42,11 +63,43 @@ impl Point {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PenType {
+    #[serde(alias = "ballpoint", alias = "pen", alias = "Pen", alias = "BALLPOINT")]
     Ballpoint,
+    #[serde(alias = "fountain", alias = "Fountain", alias = "FOUNTAIN")]
     Fountain,
+    #[serde(alias = "calligraphy", alias = "Calligraphy", alias = "CALLIGRAPHY")]
     Calligraphy,
+    #[serde(alias = "pencil", alias = "Pencil", alias = "PENCIL")]
     Pencil,
+    #[serde(alias = "highlighter", alias = "Highlighter", alias = "HIGHLIGHTER")]
     Highlighter,
+}
+
+pub fn deserialize_pen_type<'de, D>(deserializer: D) -> Result<PenType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let val = serde_json::Value::deserialize(deserializer)?;
+    match val {
+        serde_json::Value::Number(n) => match n.as_u64() {
+            Some(1) => Ok(PenType::Fountain),
+            Some(2) => Ok(PenType::Calligraphy),
+            Some(3) => Ok(PenType::Pencil),
+            Some(4) => Ok(PenType::Highlighter),
+            _ => Ok(PenType::Ballpoint),
+        },
+        serde_json::Value::String(s) => {
+            let lower = s.to_lowercase();
+            match lower.as_str() {
+                "fountain" => Ok(PenType::Fountain),
+                "calligraphy" => Ok(PenType::Calligraphy),
+                "pencil" => Ok(PenType::Pencil),
+                "highlighter" => Ok(PenType::Highlighter),
+                _ => Ok(PenType::Ballpoint),
+            }
+        }
+        _ => Ok(PenType::Ballpoint),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -63,11 +116,49 @@ pub enum ShapeType {
     Star,
 }
 
+pub fn deserialize_shape_type<'de, D>(deserializer: D) -> Result<ShapeType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let val = serde_json::Value::deserialize(deserializer)?;
+    match val {
+        serde_json::Value::Number(n) => match n.as_u64() {
+            Some(1) => Ok(ShapeType::Line),
+            Some(2) => Ok(ShapeType::Rectangle),
+            Some(3) => Ok(ShapeType::Circle),
+            Some(4) => Ok(ShapeType::Triangle),
+            Some(5) => Ok(ShapeType::Arrow),
+            Some(6) => Ok(ShapeType::DoubleArrow),
+            Some(7) => Ok(ShapeType::Pentagon),
+            Some(8) => Ok(ShapeType::Hexagon),
+            Some(9) => Ok(ShapeType::Star),
+            _ => Ok(ShapeType::None),
+        },
+        serde_json::Value::String(s) => {
+            let lower = s.to_lowercase();
+            match lower.as_str() {
+                "line" => Ok(ShapeType::Line),
+                "rectangle" | "rect" => Ok(ShapeType::Rectangle),
+                "circle" => Ok(ShapeType::Circle),
+                "triangle" => Ok(ShapeType::Triangle),
+                "arrow" => Ok(ShapeType::Arrow),
+                "doublearrow" | "double_arrow" => Ok(ShapeType::DoubleArrow),
+                "pentagon" => Ok(ShapeType::Pentagon),
+                "hexagon" => Ok(ShapeType::Hexagon),
+                "star" => Ok(ShapeType::Star),
+                _ => Ok(ShapeType::None),
+            }
+        }
+        _ => Ok(ShapeType::None),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ToolMode {
     Pen,
-    Shape(ShapeType),
     Highlighter,
+    Shape(ShapeType),
+    Text,
     EraserStroke,
     EraserPoint,
     LassoSelect,
@@ -83,6 +174,33 @@ pub enum PaperType {
     Blank,
 }
 
+pub fn deserialize_paper_type<'de, D>(deserializer: D) -> Result<PaperType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let val = serde_json::Value::deserialize(deserializer)?;
+    match val {
+        serde_json::Value::Number(n) => match n.as_u64() {
+            Some(1) => Ok(PaperType::Grid),
+            Some(2) => Ok(PaperType::DotGrid),
+            Some(3) => Ok(PaperType::Cornell),
+            Some(4) => Ok(PaperType::Blank),
+            _ => Ok(PaperType::Ruled),
+        },
+        serde_json::Value::String(s) => {
+            let lower = s.to_lowercase();
+            match lower.as_str() {
+                "grid" => Ok(PaperType::Grid),
+                "dotgrid" | "dot_grid" | "dots" => Ok(PaperType::DotGrid),
+                "cornell" => Ok(PaperType::Cornell),
+                "blank" | "white" | "plain" => Ok(PaperType::Blank),
+                _ => Ok(PaperType::Ruled),
+            }
+        }
+        _ => Ok(PaperType::Ruled),
+    }
+}
+
 impl PaperType {
     pub fn name(&self) -> &'static str {
         match self {
@@ -95,22 +213,179 @@ impl PaperType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Stroke {
-    pub id: String,
-    pub pen_type: PenType,
-    #[serde(default = "default_shape_type")]
-    pub shape_type: ShapeType,
-    #[serde(default)]
-    pub is_filled: bool,
-    pub color: [u8; 4],
-    pub size: f32,
-    pub opacity: f32,
-    pub points: Vec<Point>,
+pub fn deserialize_color<'de, D>(deserializer: D) -> Result<[u8; 4], D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let val = serde_json::Value::deserialize(deserializer)?;
+    Ok(parse_color_value(&val))
+}
+
+pub fn parse_color_value(val: &serde_json::Value) -> [u8; 4] {
+    match val {
+        serde_json::Value::String(s) => parse_hex_color(s),
+        serde_json::Value::Array(arr) => {
+            if arr.len() == 4 {
+                let r = parse_channel(&arr[0]);
+                let g = parse_channel(&arr[1]);
+                let b = parse_channel(&arr[2]);
+                let a = parse_channel(&arr[3]);
+                [r, g, b, a]
+            } else if arr.len() == 3 {
+                let r = parse_channel(&arr[0]);
+                let g = parse_channel(&arr[1]);
+                let b = parse_channel(&arr[2]);
+                [r, g, b, 255]
+            } else {
+                [0, 0, 0, 255]
+            }
+        }
+        serde_json::Value::Object(map) => {
+            let r = map.get("r").map(parse_channel).unwrap_or(0);
+            let g = map.get("g").map(parse_channel).unwrap_or(0);
+            let b = map.get("b").map(parse_channel).unwrap_or(0);
+            let a = map.get("a").map(parse_channel).unwrap_or(255);
+            [r, g, b, a]
+        }
+        serde_json::Value::Number(num) => {
+            if let Some(n) = num.as_u64() {
+                if n <= 0xFFFFFF {
+                    let r = ((n >> 16) & 0xFF) as u8;
+                    let g = ((n >> 8) & 0xFF) as u8;
+                    let b = (n & 0xFF) as u8;
+                    [r, g, b, 255]
+                } else {
+                    let r = ((n >> 24) & 0xFF) as u8;
+                    let g = ((n >> 16) & 0xFF) as u8;
+                    let b = ((n >> 8) & 0xFF) as u8;
+                    let a = (n & 0xFF) as u8;
+                    [r, g, b, a]
+                }
+            } else {
+                [0, 0, 0, 255]
+            }
+        }
+        _ => [0, 0, 0, 255],
+    }
+}
+
+fn parse_channel(val: &serde_json::Value) -> u8 {
+    if let Some(u) = val.as_u64() {
+        u.min(255) as u8
+    } else if let Some(i) = val.as_i64() {
+        i.clamp(0, 255) as u8
+    } else if let Some(f) = val.as_f64() {
+        if (0.0..=1.0).contains(&f) {
+            (f * 255.0).round() as u8
+        } else {
+            f.clamp(0.0, 255.0).round() as u8
+        }
+    } else {
+        0
+    }
+}
+
+fn parse_hex_color(s: &str) -> [u8; 4] {
+    let s = s.trim().trim_start_matches('#');
+    match s.len() {
+        3 => {
+            let r = u8::from_str_radix(&s[0..1], 16).unwrap_or(0) * 17;
+            let g = u8::from_str_radix(&s[1..2], 16).unwrap_or(0) * 17;
+            let b = u8::from_str_radix(&s[2..3], 16).unwrap_or(0) * 17;
+            [r, g, b, 255]
+        }
+        4 => {
+            let r = u8::from_str_radix(&s[0..1], 16).unwrap_or(0) * 17;
+            let g = u8::from_str_radix(&s[1..2], 16).unwrap_or(0) * 17;
+            let b = u8::from_str_radix(&s[2..3], 16).unwrap_or(0) * 17;
+            let a = u8::from_str_radix(&s[3..4], 16).unwrap_or(15) * 17;
+            [r, g, b, a]
+        }
+        6 => {
+            let r = u8::from_str_radix(&s[0..2], 16).unwrap_or(0);
+            let g = u8::from_str_radix(&s[2..4], 16).unwrap_or(0);
+            let b = u8::from_str_radix(&s[4..6], 16).unwrap_or(0);
+            [r, g, b, 255]
+        }
+        8 => {
+            let r = u8::from_str_radix(&s[0..2], 16).unwrap_or(0);
+            let g = u8::from_str_radix(&s[2..4], 16).unwrap_or(0);
+            let b = u8::from_str_radix(&s[4..6], 16).unwrap_or(0);
+            let a = u8::from_str_radix(&s[6..8], 16).unwrap_or(255);
+            [r, g, b, a]
+        }
+        _ => [0, 0, 0, 255],
+    }
+}
+
+fn default_stroke_id() -> String {
+    format!("stroke_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+}
+
+fn default_pen_type() -> PenType {
+    PenType::Ballpoint
 }
 
 fn default_shape_type() -> ShapeType {
     ShapeType::None
+}
+
+fn default_color() -> [u8; 4] {
+    [0, 0, 0, 255]
+}
+
+fn default_stroke_size() -> f32 {
+    3.0
+}
+
+fn default_opacity() -> f32 {
+    1.0
+}
+
+fn default_paper_type() -> PaperType {
+    PaperType::Ruled
+}
+
+fn default_page_width() -> f32 {
+    1000.0
+}
+
+fn default_page_height() -> f32 {
+    1400.0
+}
+
+fn default_page_id() -> String {
+    format!("page_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis())
+}
+
+fn default_notebook_title() -> String {
+    "My Notebook".to_string()
+}
+
+fn default_pages() -> Vec<Page> {
+    vec![Page::new(PaperType::Ruled)]
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stroke {
+    #[serde(default = "default_stroke_id")]
+    pub id: String,
+    #[serde(default = "default_pen_type", deserialize_with = "deserialize_pen_type")]
+    pub pen_type: PenType,
+    #[serde(default = "default_shape_type", deserialize_with = "deserialize_shape_type")]
+    pub shape_type: ShapeType,
+    #[serde(default)]
+    pub is_filled: bool,
+    #[serde(default = "default_color", deserialize_with = "deserialize_color")]
+    pub color: [u8; 4],
+    #[serde(default)]
+    pub original_color: Option<[u8; 4]>,
+    #[serde(default = "default_stroke_size")]
+    pub size: f32,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    #[serde(default)]
+    pub points: Vec<Point>,
 }
 
 impl Stroke {
@@ -134,13 +409,209 @@ impl Stroke {
     }
 }
 
+fn default_text_box_id() -> String {
+    format!("text_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+}
+
+fn default_text_box_width() -> f32 {
+    320.0
+}
+
+fn default_text_box_height() -> f32 {
+    50.0
+}
+
+fn default_text_color() -> [u8; 4] {
+    [15, 23, 42, 255]
+}
+
+fn default_font_size() -> f32 {
+    18.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Page {
+pub struct TextBox {
+    #[serde(default = "default_text_box_id")]
     pub id: String,
-    pub paper_type: PaperType,
+    pub x: f32, // world coordinates
+    pub y: f32,
+    #[serde(default = "default_text_box_width")]
+    pub width: f32,
+    #[serde(default = "default_text_box_height")]
+    pub height: f32,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default = "default_text_color", deserialize_with = "deserialize_color")]
+    pub color: [u8; 4],
+    #[serde(default)]
+    pub original_color: Option<[u8; 4]>,
+    #[serde(default = "default_font_size")]
+    pub font_size: f32,
+    #[serde(default)]
+    pub is_bold: bool,
+    #[serde(default)]
+    pub is_italic: bool,
+}
+
+impl TextBox {
+    pub fn new(x: f32, y: f32, color: [u8; 4], font_size: f32) -> Self {
+        Self {
+            id: default_text_box_id(),
+            x,
+            y,
+            width: 320.0,
+            height: 50.0,
+            text: String::new(),
+            color,
+            original_color: None,
+            font_size,
+            is_bold: false,
+            is_italic: false,
+        }
+    }
+}
+
+fn default_image_id() -> String {
+    format!("img_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageEntity {
+    #[serde(default = "default_image_id")]
+    pub id: String,
+    pub x: f32, // world coordinates on page
+    pub y: f32,
     pub width: f32,
     pub height: f32,
+    #[serde(default)]
+    pub rotation: f32,
+    #[serde(default)]
+    pub data: Vec<u8>, // PNG/JPEG encoded bytes
+}
+
+impl ImageEntity {
+    pub fn new(x: f32, y: f32, width: f32, height: f32, data: Vec<u8>) -> Self {
+        Self {
+            id: default_image_id(),
+            x,
+            y,
+            width,
+            height,
+            rotation: 0.0,
+            data,
+        }
+    }
+
+#[allow(dead_code)]
+    pub fn bounds(&self) -> (f32, f32, f32, f32) {
+        (self.x, self.y, self.x + self.width, self.y + self.height)
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_plot_id() -> String {
+    format!("plot_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlotCurveData {
+    pub label: String,
+    pub color: [u8; 4],
+    pub points: Vec<[f64; 2]>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlotEntity {
+    #[serde(default = "default_plot_id")]
+    pub id: String,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub x_min: f64,
+    pub x_max: f64,
+    pub y_min: f64,
+    pub y_max: f64,
+    #[serde(default)]
+    pub curves: Vec<PlotCurveData>,
+    #[serde(default = "default_true")]
+    pub show_grid: bool,
+    #[serde(default = "default_true")]
+    pub show_axes: bool,
+    #[serde(default)]
+    pub title: String,
+}
+
+fn default_matrix_id() -> String {
+    format!("mat_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatrixEntity {
+    #[serde(default = "default_matrix_id")]
+    pub id: String,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    #[serde(default)]
+    pub label: String,
+    pub data: Vec<Vec<f64>>,
+}
+
+fn default_grid_id() -> String {
+    format!("grid_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableGridEntity {
+    #[serde(default = "default_grid_id")]
+    pub id: String,
+    pub x: f32,
+    pub y: f32,
+    pub rows: usize,
+    pub cols: usize,
+    pub col_width: f32,
+    pub row_height: f32,
+    #[serde(default)]
+    pub cells: Vec<Vec<String>>,
+}
+
+impl TableGridEntity {
+    pub fn total_width(&self) -> f32 {
+        (self.cols.max(1) as f32) * self.col_width
+    }
+
+    pub fn total_height(&self) -> f32 {
+        (self.rows.max(1) as f32) * self.row_height
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Page {
+    #[serde(default = "default_page_id")]
+    pub id: String,
+    #[serde(default = "default_paper_type", deserialize_with = "deserialize_paper_type")]
+    pub paper_type: PaperType,
+    #[serde(default = "default_page_width")]
+    pub width: f32,
+    #[serde(default = "default_page_height")]
+    pub height: f32,
+    #[serde(default)]
     pub strokes: Vec<Stroke>,
+    #[serde(default)]
+    pub text_boxes: Vec<TextBox>,
+    #[serde(default)]
+    pub images: Vec<ImageEntity>,
+    #[serde(default)]
+    pub plots: Vec<PlotEntity>,
+    #[serde(default)]
+    pub matrices: Vec<MatrixEntity>,
+    #[serde(default)]
+    pub grids: Vec<TableGridEntity>,
 }
 
 impl Page {
@@ -151,6 +622,11 @@ impl Page {
             width: 1000.0,
             height: 1400.0,
             strokes: Vec::new(),
+            text_boxes: Vec::new(),
+            images: Vec::new(),
+            plots: Vec::new(),
+            matrices: Vec::new(),
+            grids: Vec::new(),
         }
     }
 
@@ -170,9 +646,13 @@ impl Page {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Notebook {
+    #[serde(default = "default_notebook_title")]
     pub title: String,
+    #[serde(default = "default_paper_type", deserialize_with = "deserialize_paper_type")]
     pub default_paper: PaperType,
+    #[serde(default = "default_pages")]
     pub pages: Vec<Page>,
+    #[serde(default)]
     pub current_page_index: usize,
 }
 
@@ -232,3 +712,195 @@ impl Notebook {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_color_hex_string() {
+        let json = r##"{"id":"1","pen_type":"Ballpoint","color":"#000000","size":3.0,"opacity":1.0,"points":[]}"##;
+        let stroke: Stroke = serde_json::from_str(json).unwrap();
+        assert_eq!(stroke.color, [0, 0, 0, 255]);
+
+        let json_red = r##"{"id":"2","pen_type":"Ballpoint","color":"#FF0000","size":3.0,"opacity":1.0,"points":[]}"##;
+        let stroke_red: Stroke = serde_json::from_str(json_red).unwrap();
+        assert_eq!(stroke_red.color, [255, 0, 0, 255]);
+
+        let json_rgba = r##"{"id":"3","pen_type":"Ballpoint","color":"#00FF0080","size":3.0,"opacity":1.0,"points":[]}"##;
+        let stroke_rgba: Stroke = serde_json::from_str(json_rgba).unwrap();
+        assert_eq!(stroke_rgba.color, [0, 255, 0, 128]);
+    }
+
+    #[test]
+    fn test_deserialize_color_array() {
+        let json_arr4 = r#"{"id":"1","pen_type":"Ballpoint","color":[10,20,30,240],"size":3.0,"opacity":1.0,"points":[]}"#;
+        let stroke4: Stroke = serde_json::from_str(json_arr4).unwrap();
+        assert_eq!(stroke4.color, [10, 20, 30, 240]);
+
+        let json_arr3 = r#"{"id":"2","pen_type":"Ballpoint","color":[10,20,30],"size":3.0,"opacity":1.0,"points":[]}"#;
+        let stroke3: Stroke = serde_json::from_str(json_arr3).unwrap();
+        assert_eq!(stroke3.color, [10, 20, 30, 255]);
+
+        let json_floats = r#"{"id":"3","pen_type":"Ballpoint","color":[1.0, 0.0, 0.5, 1.0],"size":3.0,"opacity":1.0,"points":[]}"#;
+        let stroke_f: Stroke = serde_json::from_str(json_floats).unwrap();
+        assert_eq!(stroke_f.color, [255, 0, 128, 255]);
+    }
+
+    #[test]
+    fn test_deserialize_color_object() {
+        let json = r#"{"id":"1","pen_type":"Ballpoint","color":{"r":255,"g":128,"b":0,"a":200},"size":3.0,"opacity":1.0,"points":[]}"#;
+        let stroke: Stroke = serde_json::from_str(json).unwrap();
+        assert_eq!(stroke.color, [255, 128, 0, 200]);
+    }
+
+    #[test]
+    fn test_backward_compatibility_old_notebook() {
+        let old_json = r##"{
+            "title": "Old Notebook",
+            "default_paper": "Ruled",
+            "pages": [{
+                "id": "p1",
+                "paper_type": "Ruled",
+                "width": 1000.0,
+                "height": 1400.0,
+                "strokes": [{
+                    "id": "s1",
+                    "pen_type": "Ballpoint",
+                    "color": "#000000",
+                    "size": 3.0,
+                    "opacity": 1.0,
+                    "points": [{"x": 100.0, "y": 200.0, "pressure": 0.5}]
+                }]
+            }]
+        }"##;
+
+        let nb: Notebook = serde_json::from_str(old_json).unwrap();
+        assert_eq!(nb.title, "Old Notebook");
+        assert_eq!(nb.pages.len(), 1);
+        assert_eq!(nb.pages[0].strokes.len(), 1);
+        assert_eq!(nb.pages[0].strokes[0].color, [0, 0, 0, 255]);
+        assert_eq!(nb.pages[0].strokes[0].points[0].thickness, 0.0);
+        assert!(nb.pages[0].text_boxes.is_empty());
+    }
+
+    #[test]
+    fn test_text_box_serialization_and_defaults() {
+        let tb = TextBox::new(100.0, 200.0, [15, 23, 42, 255], 18.0);
+        let serialized = serde_json::to_string(&tb).unwrap();
+        let deserialized: TextBox = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.x, 100.0);
+        assert_eq!(deserialized.y, 200.0);
+        assert_eq!(deserialized.color, [15, 23, 42, 255]);
+        assert_eq!(deserialized.font_size, 18.0);
+        assert!(!deserialized.is_bold);
+        assert!(!deserialized.is_italic);
+    }
+
+    #[test]
+    fn test_load_user_old_handnotes_if_present() {
+        use std::path::Path;
+        let p1 = Path::new(r"C:\Users\Lenovo\Downloads\Quick Scratchpad.handnote");
+        if p1.exists() {
+            let res = crate::storage::NotebookStorage::load(p1);
+            assert!(res.is_ok(), "Failed to load Quick Scratchpad: {:?}", res.err());
+        }
+        let p2 = Path::new(r"C:\Users\Lenovo\Downloads\My Notebook 1.handnote");
+        if p2.exists() {
+            let res = crate::storage::NotebookStorage::load(p2);
+            assert!(res.is_ok(), "Failed to load My Notebook 1: {:?}", res.err());
+        }
+    }
+
+    #[test]
+    fn test_image_entity_serialization_and_defaults() {
+        let img = ImageEntity::new(50.0, 80.0, 300.0, 200.0, vec![1, 2, 3, 4]);
+        let serialized = serde_json::to_string(&img).unwrap();
+        let deserialized: ImageEntity = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.x, 50.0);
+        assert_eq!(deserialized.y, 80.0);
+        assert_eq!(deserialized.width, 300.0);
+        assert_eq!(deserialized.height, 200.0);
+        assert_eq!(deserialized.data, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_notebook_with_images_and_strokes_roundtrip() {
+        let mut page = Page::new(PaperType::Grid);
+        page.strokes.push(Stroke {
+            id: "s1".into(),
+            pen_type: PenType::Ballpoint,
+            shape_type: ShapeType::None,
+            is_filled: false,
+            color: [0, 0, 0, 255],
+            original_color: None,
+            size: 3.0,
+            opacity: 1.0,
+            points: vec![Point::new(10.0, 20.0, 0.5), Point::new(30.0, 40.0, 0.6)],
+        });
+        page.images.push(ImageEntity::new(100.0, 150.0, 400.0, 300.0, vec![10, 20, 30]));
+
+        let mut nb = Notebook::default();
+        nb.pages = vec![page];
+
+        let json = serde_json::to_string(&nb).unwrap();
+        let loaded: Notebook = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.pages[0].strokes.len(), 1);
+        assert_eq!(loaded.pages[0].images.len(), 1);
+        assert_eq!(loaded.pages[0].images[0].width, 400.0);
+        assert_eq!(loaded.pages[0].images[0].height, 300.0);
+    }
+
+    #[test]
+    fn test_math_entities_serialization() {
+        let mut page = Page::new(PaperType::Blank);
+        page.plots.push(PlotEntity {
+            id: "p1".into(),
+            x: 50.0,
+            y: 100.0,
+            width: 500.0,
+            height: 350.0,
+            x_min: -3.14,
+            x_max: 3.14,
+            y_min: -1.0,
+            y_max: 1.0,
+            curves: vec![PlotCurveData {
+                label: "sin(x)".into(),
+                color: [37, 99, 235, 255],
+                points: vec![[-3.14, 0.0], [0.0, 0.0], [3.14, 0.0]],
+            }],
+            show_grid: true,
+            show_axes: true,
+            title: "Trigonometric Plot".into(),
+        });
+        page.matrices.push(MatrixEntity {
+            id: "m1".into(),
+            x: 600.0,
+            y: 100.0,
+            width: 250.0,
+            height: 120.0,
+            label: "A =".into(),
+            data: vec![vec![1.0, 2.0], vec![3.0, 4.0]],
+        });
+        page.grids.push(TableGridEntity {
+            id: "g1".into(),
+            x: 50.0,
+            y: 500.0,
+            rows: 3,
+            cols: 4,
+            col_width: 100.0,
+            row_height: 35.0,
+            cells: vec![vec!["Cell".into(); 4]; 3],
+        });
+
+        let serialized = serde_json::to_string(&page).unwrap();
+        let deserialized: Page = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.plots.len(), 1);
+        assert_eq!(deserialized.matrices.len(), 1);
+        assert_eq!(deserialized.grids.len(), 1);
+        assert_eq!(deserialized.plots[0].curves[0].label, "sin(x)");
+        assert_eq!(deserialized.matrices[0].data[1][0], 3.0);
+        assert_eq!(deserialized.grids[0].rows, 3);
+    }
+}
+
