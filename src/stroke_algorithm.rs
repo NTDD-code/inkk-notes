@@ -10,28 +10,27 @@ use crate::model::{PenType, Point};
 
 const PI: f32 = std::f32::consts::PI;
 
-// --- One-Euro filter tuning ---
-// Chuột máy tính thường có độ phân giải theo từng nấc pixel (stair-step jitter)
-// Cần ONE_EURO_MIN_CUTOFF êm ái (0.95 Hz) để lọc bỏ rung tay/pixel jitter khi rê chậm,
-// và BETA 0.025 để bắt kịp nhanh khi vẩy bút mà không bị gãy nét.
-const ONE_EURO_MIN_CUTOFF: f32 = 0.95;
-const ONE_EURO_BETA: f32 = 0.025;
+// --- One-Euro filter tuning (Tuned for ultra-low latency & natural fluidity) ---
+// Tăng MIN_CUTOFF lên 1.15 Hz và BETA lên 0.035 để ngòi bút bám sát tức thì vào con trỏ,
+// triệt tiêu độ trễ kéo lê, giúp đuôi bút ngắn và phản hồi nhanh như DirectInk.
+const ONE_EURO_MIN_CUTOFF: f32 = 1.15;
+const ONE_EURO_BETA: f32 = 0.035;
 const ONE_EURO_DCUTOFF: f32 = 1.2;
 
 // --- Corner protection (base at 96 DPI / 100% scale) ---
-// CHỐNG GÃY KHÚC: Chỉ khi người dùng thực sự quẹo góc gắt (> 125 độ) mới kích hoạt boost góc!
-// Tránh việc chuột di chuyển theo đường tròn (số 0, số 2, số 3, chữ o, d) bị bắt nhầm thành góc nhọn làm gãy nét.
-const CORNER_MIN_DIST_BASE: f32 = 3.5;
-const CORNER_COS_THRESHOLD: f32 = -0.55; // Góc gắt > 123 độ mới tính là góc thật
-const CORNER_CUTOFF_BOOST: f32 = 2.5; // Boost vừa phải, không tăng đột ngột làm giật tọa độ
+// Góc quẹo thật (> 120 độ) mới kích hoạt boost làm sắc góc, bảo vệ đường tròn không bị gãy
+const CORNER_MIN_DIST_BASE: f32 = 2.8;
+const CORNER_COS_THRESHOLD: f32 = -0.50;
+const CORNER_CUTOFF_BOOST: f32 = 2.5;
 
 // --- Decimation (base at 96 DPI / 100% scale) ---
-// Tăng nhẹ khoảng cách lấy mẫu để loại bỏ các điểm nhiễu rung lắc cực nhỏ (micro-jitter)
-const DECIMATE_MIN_DIST_BASE: f32 = 0.8;
-const DECIMATE_SPEED_SLOPE_BASE: f32 = 1.0;
+// Lấy mẫu mật độ dày (0.35 px tương đương Windows DirectInk và C++ INKK 0.25 px)
+// giúp đường cong mịn như lụa, không bị cứng hay giật đốt pixel
+const DECIMATE_MIN_DIST_BASE: f32 = 0.35;
+const DECIMATE_SPEED_SLOPE_BASE: f32 = 0.65;
 
 // --- Speed normalization reference (base at 96 DPI) ---
-const SPEED_REFERENCE_BASE: f32 = 1000.0;
+const SPEED_REFERENCE_BASE: f32 = 950.0;
 
 // dt clamps (seconds)
 const DT_MIN: f32 = 1.0 / 500.0; // 2ms
@@ -46,8 +45,8 @@ fn lowpass_alpha(cutoff_hz: f32, dt: f32) -> f32 {
     1.0 / (1.0 + tau / dt)
 }
 
-/// Dynamic thickness based on pen physics model
-/// Tạo ra nét thanh nét đậm tự nhiên: Viết nhanh thì thanh mảnh vuốt nhọn, viết chậm/nhấn thì đậm đà
+/// Dynamic thickness based on pen physics model (Chỉnh mềm mại, tự nhiên, đỡ cứng)
+/// Lấy cảm hứng từ phân tích Scrble Ink & C++ INKK PenDynamics
 pub fn compute_thickness(
     pen_type: PenType,
     base_thickness: f32,
@@ -57,27 +56,29 @@ pub fn compute_thickness(
     let p = pressure.clamp(0.05, 1.0);
     match pen_type {
         PenType::Ballpoint => {
-            // Bút bi chất lượng cao: Tốc độ cao thì hơi thanh (0.75x), nhấn mạnh thì nở nét (1.25x)
-            let v_factor = 1.15 - speed_factor * 0.40;
-            let p_factor = 0.70 + p * 0.60;
-            (base_thickness * v_factor * p_factor).max(0.6)
+            // Bút bi: biến thiên êm dịu, không gắt (vFactor 0.90x ~ 1.08x, pFactor 0.85x ~ 1.15x)
+            let v_factor = 1.08 - speed_factor * 0.20;
+            let p_factor = 0.85 + p * 0.30;
+            (base_thickness * v_factor * p_factor).max(0.7)
         }
         PenType::Fountain => {
-            // Bút máy: Độ biến thiên rất nhạy, thanh mảnh ở đỉnh chữ, đậm ở bụng chữ
-            let v_factor = 1.30 - speed_factor * 0.65;
-            let p_factor = 0.55 + p * 0.85;
-            (base_thickness * v_factor * p_factor).max(0.5)
+            // Bút máy: Mềm mại, nét thanh nét đậm tự nhiên nhưng không bị thắt đột ngột (đỡ cứng)
+            let v_factor = 1.20 - speed_factor * 0.40;
+            let p_factor = 0.75 + p * 0.50;
+            (base_thickness * v_factor * p_factor).max(0.6)
         }
         PenType::Pencil => {
-            let v_factor = 1.10 - speed_factor * 0.25;
-            let p_factor = 0.65 + p * 0.55;
+            // Bút chì: Nét đều, cảm giác nhám nhẹ
+            let v_factor = 1.06 - speed_factor * 0.18;
+            let p_factor = 0.78 + p * 0.35;
             (base_thickness * v_factor * p_factor).max(0.6)
         }
         PenType::Highlighter => base_thickness,
         PenType::Calligraphy => {
-            // Nét bút vát
-            let p_factor = 0.75 + p * 0.55;
-            base_thickness * p_factor
+            // Bút thư pháp: Vát mềm mại, phối hợp áp lực và tốc độ
+            let v_factor = 1.16 - speed_factor * 0.32;
+            let p_factor = 0.78 + p * 0.44;
+            (base_thickness * v_factor * p_factor).max(0.8)
         }
     }
 }

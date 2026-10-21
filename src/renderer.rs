@@ -261,7 +261,7 @@ impl NoteRenderer {
             let end_th = (p_curr.2 + p_next.2) * 0.5;
 
             let chord = start_mid.distance(end_mid);
-            let steps = ((chord / 1.5).ceil() as usize).clamp(2, 24);
+            let steps = ((chord / 1.0).ceil() as usize).clamp(3, 28);
 
             for s in 1..=steps {
                 let t = s as f32 / steps as f32;
@@ -276,7 +276,7 @@ impl NoteRenderer {
 
                 let pt = Pos2::new(x, y);
                 if let Some(&(last_pos, _, _)) = smooth.last() {
-                    if (pt.x - last_pos.x).powi(2) + (pt.y - last_pos.y).powi(2) > 0.36 {
+                    if (pt.x - last_pos.x).powi(2) + (pt.y - last_pos.y).powi(2) > 0.16 {
                         smooth.push((pt, pres, th));
                     }
                 } else {
@@ -458,9 +458,9 @@ impl NoteRenderer {
         }
     }
 
-    /// === ELASTIC TAIL (Port từ C++ Renderer.cpp) ===
+    /// === ELASTIC TAIL (Port từ C++ Renderer.cpp & tinh chỉnh đuôi ngắn gọn, thanh thoát) ===
     /// "Sticks" ink to mouse. Triệt tiêu 100% cảm giác trễ (lag),
-    /// gắn chặt đầu nét mực vào đúng đầu ngòi chuột trong thời gian thực!
+    /// gắn một đoạn cong đàn hồi ngắn mềm mại vào đầu ngòi chuột trong thời gian thực.
     pub fn render_elastic_tail<F>(
         painter: &Painter,
         stroke: &NoteStroke,
@@ -482,25 +482,34 @@ impl NoteRenderer {
 
         let dx = raw.x - end.x;
         let dy = raw.y - end.y;
-        if dx * dx + dy * dy > 0.64 {
-            // Control point: Phóng tiếp tuyến từ đoạn cuối ra phía trước (30% strength)
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist > 0.6 {
+            // Giới hạn chiều dài đuôi ngắn hơn hẳn (max 12px), không bị kéo lê dài
+            let max_tail = 12.0 * scale.clamp(0.8, 1.3);
+            let target_raw = if dist > max_tail {
+                Pos2::new(end.x + (dx / dist) * max_tail, end.y + (dy / dist) * max_tail)
+            } else {
+                raw
+            };
+
+            // Control point: Phóng tiếp tuyến nhẹ từ đoạn cuối ra phía trước (20% strength)
             let ctrl = if n >= 2 {
                 let p_penult = to_screen(Pos2::new(pts[n - 2].x, pts[n - 2].y));
                 let vx = end.x - p_penult.x;
                 let vy = end.y - p_penult.y;
-                Pos2::new(end.x + vx * 0.3, end.y + vy * 0.3)
+                Pos2::new(end.x + vx * 0.20, end.y + vy * 0.20)
             } else {
                 end
             };
 
-            // Vẽ đường nối cong Quadratic Bezier từ điểm cuối nét mực dính vào đầu con trỏ
-            let steps = 8;
+            // Vẽ đường nối cong Quadratic Bezier ngắn, vuốt mảnh dần về phía con trỏ
+            let steps = 6;
             let mut tail_pts = Vec::with_capacity(steps + 1);
             for s in 0..=steps {
                 let t = s as f32 / steps as f32;
                 let omt = 1.0 - t;
-                let x = omt * omt * end.x + 2.0 * omt * t * ctrl.x + t * t * raw.x;
-                let y = omt * omt * end.y + 2.0 * omt * t * ctrl.y + t * t * raw.y;
+                let x = omt * omt * end.x + 2.0 * omt * t * ctrl.x + t * t * target_raw.x;
+                let y = omt * omt * end.y + 2.0 * omt * t * ctrl.y + t * t * target_raw.y;
                 tail_pts.push(Pos2::new(x, y));
             }
 
@@ -513,13 +522,13 @@ impl NoteRenderer {
             );
 
             let th = if last_pt.thickness > 0.01 {
-                (last_pt.thickness * scale * 0.9).max(1.0)
+                (last_pt.thickness * scale * 0.75).max(1.0)
             } else {
-                (stroke.size * scale * 0.85).max(1.0)
+                (stroke.size * scale * 0.70).max(1.0)
             };
 
+            // Nối nét thanh mảnh, không vẽ đốm tròn thừa ở đầu trỏ để đuôi cực kỳ gọn gàng
             painter.add(egui::Shape::line(tail_pts, Stroke::new(th, color)));
-            painter.circle_filled(raw, th * 0.5, color);
         }
     }
     fn render_variable_width_ribbon(

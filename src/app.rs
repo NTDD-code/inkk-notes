@@ -1008,13 +1008,13 @@ impl eframe::App for HandNoteApp {
                                         self.current_pressure = f.clamp(0.05, 1.0);
                                         self.current_pressure
                                     } else {
-                                        // Speed-based dynamic tapering: phản hồi nhạy theo tốc độ lướt tay
+                                        // Speed-based dynamic tapering (Chỉnh mềm mại, tự nhiên, đỡ cứng)
                                         let dt = self.last_pointer_time.elapsed().as_secs_f32().clamp(0.001, 0.05);
                                         let dist = (bounded_x - self.last_pointer_pos_world.x).hypot(bounded_y - self.last_pointer_pos_world.y);
                                         let speed = dist / dt; // world pixels per sec
-                                        // Nét lướt nhanh thanh thoát (0.35x), dừng lại nhấn đậm (1.0x)
-                                        let target = (1.0 - (speed / 1800.0) * 0.65).clamp(0.25, 1.0);
-                                        self.current_pressure = self.current_pressure * 0.50 + target * 0.50;
+                                        // Độ biến thiên êm dịu, không giật đột ngột
+                                        let target = (1.0 - (speed / 1600.0) * 0.40).clamp(0.40, 1.0);
+                                        self.current_pressure = self.current_pressure * 0.75 + target * 0.25;
                                         self.current_pressure
                                     };
                                     self.last_pointer_time = std::time::Instant::now();
@@ -1038,6 +1038,14 @@ impl eframe::App for HandNoteApp {
                                         if self.notebook.current_page_mut().check_auto_expand(bounded_y) {
                                             self.set_status("Page auto-expanded! ♾️");
                                         }
+                                    }
+
+                                    // === SCRBLE INK: WritingArea Auto-Scroll (Tự động cuộn êm khi viết sát mép dưới) ===
+                                    let screen_pos = self.to_screen(Pos2::new(bounded_x, bounded_y));
+                                    let threshold_y = canvas_rect.max.y - 70.0;
+                                    if screen_pos.y > threshold_y {
+                                        let scroll_amount = ((screen_pos.y - threshold_y) * 0.18).clamp(1.0, 5.0);
+                                        self.pan.y -= scroll_amount;
                                     }
                                 }
                             }
