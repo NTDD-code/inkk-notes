@@ -256,25 +256,57 @@ impl HandNoteApp {
                     ui.separator();
                 }
 
-                // Quick Color Swatches
+                // Quick Color Swatches: Click trực tiếp vào vòng màu để vừa chọn màu vừa kích hoạt bút vẽ!
                 let quick_colors = [
-                    Color32::from_rgb(0, 0, 0),         // Black
-                    Color32::from_rgb(248, 250, 252),   // White
-                    Color32::from_rgb(37, 99, 235),     // Blue
-                    Color32::from_rgb(220, 38, 38),     // Red
-                    Color32::from_rgb(22, 163, 74),     // Green
-                    Color32::from_rgb(234, 179, 8),     // Yellow
-                    Color32::from_rgb(147, 51, 234),    // Purple
+                    (Color32::from_rgb(15, 23, 42), "Black"),
+                    (Color32::from_rgb(220, 38, 38), "Red"),
+                    (Color32::from_rgb(37, 99, 235), "Blue"),
+                    (Color32::from_rgb(22, 163, 74), "Green"),
+                    (Color32::from_rgb(234, 179, 8), "Yellow"),
+                    (Color32::from_rgb(147, 51, 234), "Purple"),
+                    (Color32::from_rgb(248, 250, 252), "White"),
                 ];
 
-                for c in quick_colors {
+                for (c, tip) in quick_colors {
                     let is_cur = self.color == c;
-                    if ui.radio(is_cur, "").clicked() {
+                    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(22.0), Sense::click());
+                    let resp = resp.on_hover_text(tip);
+
+                    if resp.clicked() {
                         self.color = c;
+                        // Nếu đang ở tẩy hay pan thì tự động nhảy về bút vẽ luôn
+                        if self.tool == ToolMode::EraserStroke
+                            || self.tool == ToolMode::EraserPoint
+                            || self.tool == ToolMode::Pan
+                        {
+                            self.tool = ToolMode::Pen;
+                        }
                     }
-                    let (rect, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::click());
-                    ui.painter().circle_filled(rect.center(), 7.0, c);
-                    ui.painter().circle_stroke(rect.center(), 7.0, Stroke::new(1.0_f32, Color32::from_gray(140)));
+
+                    let center = rect.center();
+                    if is_cur {
+                        // Vòng viền active nổi bật quanh nút màu đang chọn
+                        ui.painter().circle_stroke(
+                            center,
+                            10.0,
+                            Stroke::new(2.2_f32, Color32::from_rgb(59, 130, 246)),
+                        );
+                        ui.painter().circle_filled(center, 7.0, c);
+                    } else {
+                        if resp.hovered() {
+                            ui.painter().circle_stroke(
+                                center,
+                                9.5,
+                                Stroke::new(1.5_f32, Color32::from_gray(160)),
+                            );
+                        }
+                        ui.painter().circle_filled(center, 7.5, c);
+                        ui.painter().circle_stroke(
+                            center,
+                            7.5,
+                            Stroke::new(1.0_f32, Color32::from_gray(120)),
+                        );
+                    }
                 }
 
                 ui.color_edit_button_srgba(&mut self.color);
