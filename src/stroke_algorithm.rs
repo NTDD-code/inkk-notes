@@ -11,26 +11,30 @@ use crate::model::{PenType, Point};
 const PI: f32 = std::f32::consts::PI;
 
 // --- One-Euro filter tuning ---
-// Tăng ONE_EURO_BETA và MIN_CUTOFF để bút phản hồi tức thì, không bị lag/trễ khiến cảm giác viết bị "cứng đơ"
-const ONE_EURO_MIN_CUTOFF: f32 = 1.2;
-const ONE_EURO_BETA: f32 = 0.045;
-const ONE_EURO_DCUTOFF: f32 = 1.5;
+// Chuột máy tính thường có độ phân giải theo từng nấc pixel (stair-step jitter)
+// Cần ONE_EURO_MIN_CUTOFF êm ái (0.95 Hz) để lọc bỏ rung tay/pixel jitter khi rê chậm,
+// và BETA 0.025 để bắt kịp nhanh khi vẩy bút mà không bị gãy nét.
+const ONE_EURO_MIN_CUTOFF: f32 = 0.95;
+const ONE_EURO_BETA: f32 = 0.025;
+const ONE_EURO_DCUTOFF: f32 = 1.2;
 
 // --- Corner protection (base at 96 DPI / 100% scale) ---
-const CORNER_MIN_DIST_BASE: f32 = 1.8;
-const CORNER_COS_THRESHOLD: f32 = -0.15; // Phản xạ góc nhạy hơn
-const CORNER_CUTOFF_BOOST: f32 = 5.0; // Boost nhanh khi quẹo góc chữ
+// CHỐNG GÃY KHÚC: Chỉ khi người dùng thực sự quẹo góc gắt (> 125 độ) mới kích hoạt boost góc!
+// Tránh việc chuột di chuyển theo đường tròn (số 0, số 2, số 3, chữ o, d) bị bắt nhầm thành góc nhọn làm gãy nét.
+const CORNER_MIN_DIST_BASE: f32 = 3.5;
+const CORNER_COS_THRESHOLD: f32 = -0.55; // Góc gắt > 123 độ mới tính là góc thật
+const CORNER_CUTOFF_BOOST: f32 = 2.5; // Boost vừa phải, không tăng đột ngột làm giật tọa độ
 
 // --- Decimation (base at 96 DPI / 100% scale) ---
-// Giảm ngưỡng decimation để thu nhiều vi điểm hơn ở các khúc lượn cong
-const DECIMATE_MIN_DIST_BASE: f32 = 0.15;
-const DECIMATE_SPEED_SLOPE_BASE: f32 = 0.5;
+// Tăng nhẹ khoảng cách lấy mẫu để loại bỏ các điểm nhiễu rung lắc cực nhỏ (micro-jitter)
+const DECIMATE_MIN_DIST_BASE: f32 = 0.8;
+const DECIMATE_SPEED_SLOPE_BASE: f32 = 1.0;
 
 // --- Speed normalization reference (base at 96 DPI) ---
-const SPEED_REFERENCE_BASE: f32 = 1100.0;
+const SPEED_REFERENCE_BASE: f32 = 1000.0;
 
 // dt clamps (seconds)
-const DT_MIN: f32 = 1.0 / 1000.0; // 1ms
+const DT_MIN: f32 = 1.0 / 500.0; // 2ms
 const DT_MAX: f32 = 1.0 / 20.0; // 50ms (stalled gap)
 
 #[inline]

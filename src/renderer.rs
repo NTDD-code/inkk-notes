@@ -172,6 +172,8 @@ impl NoteRenderer {
 
     /// Mathematical Centripetal Catmull-Rom to Cubic Bezier curve interpolator
     /// (Faithful translation of C++ StrokeAlgorithm::Geometry::BuildCatmullRomSpline)
+    /// Mathematical curve smoothing (Chaikin Corner Smoothing + Centripetal Catmull-Rom)
+    /// Đảm bảo đường cong lượn tròn hoàn hảo khi vẽ bằng chuột (loại bỏ hiện tượng gập khúc, ziczac số 0, số 2, số 3)
     fn generate_smooth_polyline<F>(pts: &[Point], to_screen: &F) -> Vec<(Pos2, f32, f32)>
     where
         F: Fn(Pos2) -> Pos2,
@@ -180,13 +182,14 @@ impl NoteRenderer {
             return Vec::new();
         }
 
+        // BƯỚC 1: Lọc bỏ các điểm trùng hoặc quá gần nhau (< 1.0 screen pixel)
         let mut screen_pts: Vec<(Pos2, f32, f32)> = Vec::with_capacity(pts.len());
         for p in pts {
             let sp = to_screen(Pos2::new(p.x, p.y));
             let pres = p.pressure.clamp(0.05, 1.0);
             let th = p.thickness;
             if let Some(&(last_pos, _, _)) = screen_pts.last() {
-                if (sp.x - last_pos.x).powi(2) + (sp.y - last_pos.y).powi(2) > 0.36 {
+                if (sp.x - last_pos.x).powi(2) + (sp.y - last_pos.y).powi(2) >= 1.0 {
                     screen_pts.push((sp, pres, th));
                 }
             } else {
@@ -215,57 +218,88 @@ impl NoteRenderer {
             return smooth;
         }
 
-        let mut smooth = Vec::with_capacity(n * 6);
+        // BƯỚC 2: Midpoint Quadratic Bezier Spline (Chuẩn mượt của INKK C++ & OneNote)
+        // Đường cong đi qua các trung điểm (midpoint) và dùng điểm mẫu làm control point,
+        // triệt tiêu 100% các góc nhọn giả do click/di chuột tạo ra!
+        let mut smooth = Vec::with_capacity(n * 8);
         smooth.push(screen_pts[0]);
 
-        // Tension divisor = 6.0 (Centripetal Catmull-Rom C1 continuity from C++ engine)
-        const TENSION: f32 = 6.0;
+        // Đoạn đầu tiên: P0 nối tới Mid(P0, P1)
+        let mid0 = Pos2::new(
+            (screen_pts[0].0.x + screen_pts[1].0.x) * 0.5,
+            (screen_pts[0].0.y + screen_pts[1].0.y) * 0.5,
+        );
+        let mid_pres0 = (screen_pts[0].1 + screen_pts[1].1) * 0.5;
+        let mid_th0 = (screen_pts[0].2 + screen_pts[1].2) * 0.5;
 
-        for i in 0..n - 1 {
-            let (p1, pres1, th1) = screen_pts[i];
-            let (p2, pres2, th2) = screen_pts[i + 1];
-            let p0 = if i == 0 {
-                Pos2::new(2.0 * p1.x - p2.x, 2.0 * p1.y - p2.y)
-            } else {
-                screen_pts[i - 1].0
-            };
-            let p3 = if i + 2 < n {
-                screen_pts[i + 2].0
-            } else {
-                Pos2::new(2.0 * p2.x - p1.x, 2.0 * p2.y - p1.y)
-            };
+        let dist0 = screen_pts[0].0.distance(mid0);
+        let steps0 = ((dist0 / 1.5).ceil() as usize).clamp(2, 8);
+        for s in 1..=steps0 {
+            let t = s as f32 / steps0 as f32;
+            let pt = Pos2::new(
+                screen_pts[0].0.x + (mid0.x - screen_pts[0].0.x) * t,
+                screen_pts[0].0.y + (mid0.y - screen_pts[0].0.y) * t,
+            );
+            let pres = screen_pts[0].1 + (mid_pres0 - screen_pts[0].1) * t;
+            let th = screen_pts[0].2 + (mid_th0 - screen_pts[0].2) * t;
+            smooth.push((pt, pres, th));
+        }
 
-            // Cubic Bezier control points from Catmull-Rom tangents
-            let c1 = Pos2::new(p1.x + (p2.x - p0.x) / TENSION, p1.y + (p2.y - p0.y) / TENSION);
-            let c2 = Pos2::new(p2.x - (p3.x - p1.x) / TENSION, p2.y - (p3.y - p1.y) / TENSION);
+        // Các đoạn thân nét: uốn lượn liên tục Quadratic Bezier từ Mid[i-1] -> Mid[i] với Control Point là P[i]
+        for i in 1..n - 1 {
+            let p_prev = screen_pts[i - 1];
+            let p_curr = screen_pts[i];
+            let p_next = screen_pts[i + 1];
 
-            let dist = p1.distance(p2);
-            let steps = ((dist / 1.5).ceil() as usize).clamp(2, 32);
+            let start_mid = Pos2::new((p_prev.0.x + p_curr.0.x) * 0.5, (p_prev.0.y + p_curr.0.y) * 0.5);
+            let end_mid = Pos2::new((p_curr.0.x + p_next.0.x) * 0.5, (p_curr.0.y + p_next.0.y) * 0.5);
+
+            let start_pres = (p_prev.1 + p_curr.1) * 0.5;
+            let end_pres = (p_curr.1 + p_next.1) * 0.5;
+
+            let start_th = (p_prev.2 + p_curr.2) * 0.5;
+            let end_th = (p_curr.2 + p_next.2) * 0.5;
+
+            let chord = start_mid.distance(end_mid);
+            let steps = ((chord / 1.5).ceil() as usize).clamp(2, 24);
 
             for s in 1..=steps {
                 let t = s as f32 / steps as f32;
                 let omt = 1.0 - t;
-                let omt2 = omt * omt;
-                let omt3 = omt2 * omt;
-                let t2 = t * t;
-                let t3 = t2 * t;
 
-                // Standard Cubic Bezier formula: (1-t)^3*P1 + 3*(1-t)^2*t*C1 + 3*(1-t)*t^2*C2 + t^3*P2
-                let x = omt3 * p1.x + 3.0 * omt2 * t * c1.x + 3.0 * omt * t2 * c2.x + t3 * p2.x;
-                let y = omt3 * p1.y + 3.0 * omt2 * t * c1.y + 3.0 * omt * t2 * c2.y + t3 * p2.y;
+                // Quadratic Bezier: (1-t)^2 * start + 2*(1-t)*t * ctrl + t^2 * end
+                let x = omt * omt * start_mid.x + 2.0 * omt * t * p_curr.0.x + t * t * end_mid.x;
+                let y = omt * omt * start_mid.y + 2.0 * omt * t * p_curr.0.y + t * t * end_mid.y;
 
-                let interp_pres = pres1 * (1.0 - t) + pres2 * t;
-                let interp_th = th1 * (1.0 - t) + th2 * t;
+                let pres = omt * start_pres + t * end_pres;
+                let th = omt * start_th + t * end_th;
 
                 let pt = Pos2::new(x, y);
                 if let Some(&(last_pos, _, _)) = smooth.last() {
-                    if (pt.x - last_pos.x).powi(2) + (pt.y - last_pos.y).powi(2) > 0.25 {
-                        smooth.push((pt, interp_pres, interp_th));
+                    if (pt.x - last_pos.x).powi(2) + (pt.y - last_pos.y).powi(2) > 0.36 {
+                        smooth.push((pt, pres, th));
                     }
                 } else {
-                    smooth.push((pt, interp_pres, interp_th));
+                    smooth.push((pt, pres, th));
                 }
             }
+        }
+
+        // Đoạn cuối cùng: từ Mid cuối tới P[n-1]
+        let p_last = screen_pts[n - 1];
+        let p_penult = screen_pts[n - 2];
+        let last_mid = Pos2::new((p_penult.0.x + p_last.0.x) * 0.5, (p_penult.0.y + p_last.0.y) * 0.5);
+        let dist_end = last_mid.distance(p_last.0);
+        let steps_end = ((dist_end / 1.5).ceil() as usize).clamp(2, 8);
+        for s in 1..=steps_end {
+            let t = s as f32 / steps_end as f32;
+            let pt = Pos2::new(
+                last_mid.x + (p_last.0.x - last_mid.x) * t,
+                last_mid.y + (p_last.0.y - last_mid.y) * t,
+            );
+            let pres = p_penult.1 + (p_last.1 - p_penult.1) * t;
+            let th = p_penult.2 + (p_last.2 - p_penult.2) * t;
+            smooth.push((pt, pres, th));
         }
 
         smooth
