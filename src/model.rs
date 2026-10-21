@@ -5,11 +5,31 @@ pub struct Point {
     pub x: f32,
     pub y: f32,
     pub pressure: f32,
+    #[serde(default = "default_point_thickness")]
+    pub thickness: f32,
+}
+
+fn default_point_thickness() -> f32 {
+    0.0
 }
 
 impl Point {
     pub fn new(x: f32, y: f32, pressure: f32) -> Self {
-        Self { x, y, pressure }
+        Self {
+            x,
+            y,
+            pressure,
+            thickness: 0.0,
+        }
+    }
+
+    pub fn with_thickness(x: f32, y: f32, pressure: f32, thickness: f32) -> Self {
+        Self {
+            x,
+            y,
+            pressure,
+            thickness,
+        }
     }
 
     #[allow(dead_code)]
@@ -23,14 +43,30 @@ impl Point {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PenType {
     Ballpoint,
+    Fountain,
     Calligraphy,
     Pencil,
     Highlighter,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ShapeType {
+    None,
+    Line,
+    Rectangle,
+    Circle,
+    Triangle,
+    Arrow,
+    DoubleArrow,
+    Pentagon,
+    Hexagon,
+    Star,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ToolMode {
     Pen,
+    Shape(ShapeType),
     Highlighter,
     EraserStroke,
     EraserPoint,
@@ -63,10 +99,18 @@ impl PaperType {
 pub struct Stroke {
     pub id: String,
     pub pen_type: PenType,
+    #[serde(default = "default_shape_type")]
+    pub shape_type: ShapeType,
+    #[serde(default)]
+    pub is_filled: bool,
     pub color: [u8; 4],
     pub size: f32,
     pub opacity: f32,
     pub points: Vec<Point>,
+}
+
+fn default_shape_type() -> ShapeType {
+    ShapeType::None
 }
 
 impl Stroke {

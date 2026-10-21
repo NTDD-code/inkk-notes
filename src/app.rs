@@ -1,9 +1,12 @@
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use std::collections::HashSet;
 
-use crate::model::{Notebook, PaperType, PenType, Point, Stroke as NoteStroke, ToolMode};
+use crate::model::{
+    Notebook, PaperType, PenType, Point, ShapeType, Stroke as NoteStroke, ToolMode,
+};
 use crate::renderer::NoteRenderer;
 use crate::storage::NotebookStorage;
+use crate::stroke_algorithm::StabilizerPipeline;
 
 fn point_in_polygon(p: Pos2, poly: &[Pos2]) -> bool {
     if poly.len() < 3 {
@@ -33,11 +36,15 @@ pub struct HandNoteApp {
     // Tool state
     tool: ToolMode,
     pen_type: PenType,
+    current_shape: ShapeType,
+    is_shape_filled: bool,
     color: Color32,
     size: f32,
     opacity: f32,
 
-    // Pressure tracking (Wacom / Stylus + Dynamic Velocity fallback)
+    // C++ One-Euro Stabilizer Pipeline & Timestamp Tracker
+    stabilizer: StabilizerPipeline,
+    app_start_time: std::time::Instant,
     current_pressure: f32,
     last_pointer_time: std::time::Instant,
     last_pointer_pos_world: Pos2,
@@ -68,10 +75,14 @@ impl Default for HandNoteApp {
 
             tool: ToolMode::Pen,
             pen_type: PenType::Ballpoint,
+            current_shape: ShapeType::Rectangle,
+            is_shape_filled: false,
             color: Color32::from_rgb(0, 0, 0),
             size: 3.0,
             opacity: 1.0,
 
+            stabilizer: StabilizerPipeline::new(),
+            app_start_time: std::time::Instant::now(),
             current_pressure: 0.5,
             last_pointer_time: std::time::Instant::now(),
             last_pointer_pos_world: Pos2::ZERO,
@@ -186,8 +197,10 @@ impl HandNoteApp {
                 ui.separator();
 
                 // Tools selection
+                let is_shape_tool = matches!(self.tool, ToolMode::Shape(_));
                 let tools = [
                     (ToolMode::Pen, "✏ Pen"),
+                    (ToolMode::Shape(self.current_shape), "📐 Shape"),
                     (ToolMode::Highlighter, "🖍 Highlighter"),
                     (ToolMode::EraserStroke, "🧹 Stroke Eraser"),
                     (ToolMode::EraserPoint, "✂ Point Eraser"),
@@ -196,7 +209,11 @@ impl HandNoteApp {
                 ];
 
                 for (mode, label) in tools {
-                    if ui.selectable_label(self.tool == mode, label).clicked() {
+                    let is_active = match (self.tool, mode) {
+                        (ToolMode::Shape(_), ToolMode::Shape(_)) => true,
+                        (a, b) => a == b,
+                    };
+                    if ui.selectable_label(is_active, label).clicked() {
                         self.tool = mode;
                         if mode != ToolMode::LassoSelect {
                             self.selected_stroke_ids.clear();
@@ -206,11 +223,36 @@ impl HandNoteApp {
 
                 ui.separator();
 
-                // Pen subtypes
+                // Pen subtypes (Ballpoint, Fountain, Calligraphy, Pencil)
                 if self.tool == ToolMode::Pen {
                     ui.selectable_value(&mut self.pen_type, PenType::Ballpoint, "Ballpoint");
+                    ui.selectable_value(&mut self.pen_type, PenType::Fountain, "✒ Fountain");
                     ui.selectable_value(&mut self.pen_type, PenType::Calligraphy, "Calligraphy");
                     ui.selectable_value(&mut self.pen_type, PenType::Pencil, "Pencil");
+                    ui.separator();
+                } else if is_shape_tool {
+                    egui::ComboBox::from_id_salt("shape_select")
+                        .selected_text(format!("{:?}", self.current_shape))
+                        .show_ui(ui, |ui| {
+                            let shapes = [
+                                ShapeType::Line,
+                                ShapeType::Arrow,
+                                ShapeType::DoubleArrow,
+                                ShapeType::Rectangle,
+                                ShapeType::Circle,
+                                ShapeType::Triangle,
+                                ShapeType::Pentagon,
+                                ShapeType::Hexagon,
+                                ShapeType::Star,
+                            ];
+                            for s in shapes {
+                                if ui.selectable_label(self.current_shape == s, format!("{:?}", s)).clicked() {
+                                    self.current_shape = s;
+                                    self.tool = ToolMode::Shape(s);
+                                }
+                            }
+                        });
+                    ui.checkbox(&mut self.is_shape_filled, "Filled");
                     ui.separator();
                 }
 
@@ -813,7 +855,7 @@ impl eframe::App for HandNoteApp {
                                     self.lasso_points = vec![world];
                                 }
                             }
-                            ToolMode::Pen | ToolMode::Highlighter => {
+                            ToolMode::Pen | ToolMode::Highlighter | ToolMode::Shape(_) => {
                                 // Strictly forbid starting a stroke outside the paper page boundaries!
                                 if world.x >= 0.0 && world.x <= page_w && world.y >= 0.0 {
                                     let pen = if self.tool == ToolMode::Highlighter {
@@ -822,23 +864,43 @@ impl eframe::App for HandNoteApp {
                                         self.pen_type
                                     };
 
+                                    let shape = match self.tool {
+                                        ToolMode::Shape(s) => s,
+                                        _ => ShapeType::None,
+                                    };
+
                                     let pressure = if let Some(f) = hardware_force {
                                         self.current_pressure = f.clamp(0.05, 1.0);
                                         self.current_pressure
                                     } else {
                                         0.5
                                     };
+
                                     self.last_pointer_time = std::time::Instant::now();
                                     self.last_pointer_pos_world = world;
+
+                                    // Reset One-Euro stabilizer pipeline (from C++ StabilizerPipeline::Reset)
+                                    self.stabilizer.set_dpi_scale(ctx.pixels_per_point());
+                                    self.stabilizer.reset(world.x, world.y, pressure);
+
+                                    let _timestamp_sec = self.app_start_time.elapsed().as_secs_f64();
+                                    let initial_pt = Point::with_thickness(
+                                        world.x,
+                                        world.y,
+                                        pressure,
+                                        crate::stroke_algorithm::compute_thickness(pen, self.size, 0.0, pressure),
+                                    );
 
                                     let c = [self.color.r(), self.color.g(), self.color.b(), self.color.a()];
                                     self.current_stroke = Some(NoteStroke {
                                         id: format!("stroke_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()),
                                         pen_type: pen,
+                                        shape_type: shape,
+                                        is_filled: self.is_shape_filled,
                                         color: c,
                                         size: self.size,
                                         opacity: self.opacity,
-                                        points: vec![Point::new(world.x, world.y, pressure)],
+                                        points: vec![initial_pt],
                                     });
                                     self.redo_stack.clear();
                                 }
@@ -883,46 +945,55 @@ impl eframe::App for HandNoteApp {
                                     }
                                 }
                             }
+                            ToolMode::Shape(_) => {
+                                if let Some(ref mut stroke) = self.current_stroke {
+                                    let bounded_x = world.x.clamp(0.0, page_w);
+                                    let bounded_y = world.y.max(0.0);
+                                    if stroke.points.len() < 2 {
+                                        stroke.points.push(Point::new(bounded_x, bounded_y, 0.5));
+                                    } else {
+                                        stroke.points[1] = Point::new(bounded_x, bounded_y, 0.5);
+                                    }
+                                }
+                            }
                             ToolMode::Pen | ToolMode::Highlighter => {
                                 if let Some(ref mut stroke) = self.current_stroke {
-                                    if let Some(last) = stroke.points.last() {
-                                        // Restrict inking points to paper sheet width [0.0, page_w] and y >= 0.0
-                                        let bounded_x = world.x.clamp(0.0, page_w);
-                                        let bounded_y = world.y.max(0.0);
-                                        let d_sq = (bounded_x - last.x).powi(2) + (bounded_y - last.y).powi(2);
+                                    // Restrict inking points to paper sheet width [0.0, page_w] and y >= 0.0
+                                    let bounded_x = world.x.clamp(0.0, page_w);
+                                    let bounded_y = world.y.max(0.0);
 
-                                        // Capture threshold based on SCREEN distance (1.2 screen pixels):
-                                        // This ensures that even at 500% zoom, capture is instant, fluid, and sub-millimeter smooth!
-                                        let min_dist_world = 1.2_f32 / self.scale.clamp(0.1, 8.0);
-                                        let min_d_sq = min_dist_world * min_dist_world;
+                                    let raw_pressure = if let Some(f) = hardware_force {
+                                        self.current_pressure = f.clamp(0.05, 1.0);
+                                        self.current_pressure
+                                    } else {
+                                        // Speed-based dynamic tapering fallback
+                                        let dt = self.last_pointer_time.elapsed().as_secs_f32().max(0.001);
+                                        let dist = (bounded_x - self.last_pointer_pos_world.x).hypot(bounded_y - self.last_pointer_pos_world.y);
+                                        let speed = (dist * self.scale) / dt;
+                                        let target = (0.90 - (speed / 1600.0) * 0.50).clamp(0.20, 1.0);
+                                        self.current_pressure = self.current_pressure * 0.65 + target * 0.35;
+                                        self.current_pressure
+                                    };
+                                    self.last_pointer_time = std::time::Instant::now();
+                                    self.last_pointer_pos_world = Pos2::new(bounded_x, bounded_y);
 
-                                        if d_sq >= min_d_sq {
-                                            let pressure = if let Some(f) = hardware_force {
-                                                self.current_pressure = f.clamp(0.05, 1.0);
-                                                self.current_pressure
-                                            } else {
-                                                // Intelligent speed-based tapering fallback
-                                                let dt = self.last_pointer_time.elapsed().as_secs_f32().max(0.001);
-                                                let dist = (bounded_x - self.last_pointer_pos_world.x).hypot(bounded_y - self.last_pointer_pos_world.y);
-                                                let speed = (dist * self.scale) / dt;
-                                                let target = (0.90 - (speed / 1600.0) * 0.50).clamp(0.20, 1.0);
-                                                self.current_pressure = self.current_pressure * 0.65 + target * 0.35;
-                                                self.current_pressure
-                                            };
-                                            self.last_pointer_time = std::time::Instant::now();
-                                            self.last_pointer_pos_world = Pos2::new(bounded_x, bounded_y);
+                                    let timestamp_sec = self.app_start_time.elapsed().as_secs_f64();
+                                    // === ONE-EURO ADAPTIVE FILTERING & CORNER-DETECTION PIPELINE ===
+                                    if let Some(smoothed_pt) = self.stabilizer.process_point(
+                                        bounded_x,
+                                        bounded_y,
+                                        raw_pressure,
+                                        self.size,
+                                        stroke.pen_type,
+                                        timestamp_sec,
+                                    ) {
+                                        stroke.points.push(smoothed_pt);
+                                    }
 
-                                            // Light filter: 15% previous + 85% current for zero lag
-                                            let smooth_x = last.x * 0.15 + bounded_x * 0.85;
-                                            let smooth_y = last.y * 0.15 + bounded_y * 0.85;
-                                            stroke.points.push(Point::new(smooth_x, smooth_y, pressure));
-                                        }
-
-                                        // Dynamically auto-expand page downwards when writing near bottom
-                                        if bounded_y > self.notebook.current_page().height - 200.0 {
-                                            if self.notebook.current_page_mut().check_auto_expand(bounded_y) {
-                                                self.set_status("Page auto-expanded! ♾️");
-                                            }
+                                    // Dynamically auto-expand page downwards when writing near bottom
+                                    if bounded_y > self.notebook.current_page().height - 200.0 {
+                                        if self.notebook.current_page_mut().check_auto_expand(bounded_y) {
+                                            self.set_status("Page auto-expanded! ♾️");
                                         }
                                     }
                                 }
@@ -986,8 +1057,14 @@ impl eframe::App for HandNoteApp {
                         self.lasso_points.clear();
                     }
 
-                    if let Some(stroke) = self.current_stroke.take() {
+                    if let Some(mut stroke) = self.current_stroke.take() {
                         if !stroke.points.is_empty() {
+                            // Inertia end point flush (from C++ StabilizerPipeline::FlushEndPoint)
+                            if stroke.shape_type == ShapeType::None {
+                                if let Some(end_pt) = self.stabilizer.flush_end_point(self.size, stroke.pen_type) {
+                                    stroke.points.push(end_pt);
+                                }
+                            }
                             let mut max_y = 0.0f32;
                             for p in &stroke.points {
                                 if p.y > max_y {

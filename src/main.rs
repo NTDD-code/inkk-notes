@@ -1,5 +1,6 @@
 mod model;
 mod storage;
+mod stroke_algorithm;
 mod renderer;
 mod app;
 
