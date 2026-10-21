@@ -364,47 +364,20 @@ impl NoteRenderer {
                     painter.circle_filled(last, w * 0.5, hl_color);
                 }
             }
-            PenType::Ballpoint => {
-                let avg_pres = {
-                    let sum: f32 = pts.iter().map(|p| p.pressure).sum();
-                    (sum / pts.len() as f32).clamp(0.05, 1.0)
+            PenType::Ballpoint | PenType::Pencil | PenType::Fountain => {
+                // Toàn bộ bút mực/bút bi/bút chì đều hiển thị dải ribbon có bề dày biến thiên theo từng vi điểm
+                // (Variable-width Ribbon Mesh), loại bỏ hoàn toàn tình trạng nét vẽ bị cứng đơ như ống sắt!
+                let draw_color = if stroke.pen_type == PenType::Pencil {
+                    Color32::from_rgba_unmultiplied(
+                        stroke.color[0],
+                        stroke.color[1],
+                        stroke.color[2],
+                        (base_alpha as f32 * 0.88) as u8,
+                    )
+                } else {
+                    color
                 };
-                let w = (stroke.size * (0.35 + 0.85 * avg_pres) * scale).max(1.0);
-                let poly_pts: Vec<Pos2> = smooth_pts.iter().map(|(p, _, _)| *p).collect();
-
-                painter.add(egui::Shape::line(poly_pts.clone(), Stroke::new(w, color)));
-                if let Some(&first) = poly_pts.first() {
-                    painter.circle_filled(first, w * 0.5, color);
-                }
-                if let Some(&last) = poly_pts.last() {
-                    painter.circle_filled(last, w * 0.5, color);
-                }
-            }
-            PenType::Pencil => {
-                let avg_pres = {
-                    let sum: f32 = pts.iter().map(|p| p.pressure).sum();
-                    (sum / pts.len() as f32).clamp(0.05, 1.0)
-                };
-                let w = (stroke.size * (0.30 + 0.70 * avg_pres) * scale).max(0.8);
-                let pencil_color = Color32::from_rgba_unmultiplied(
-                    stroke.color[0],
-                    stroke.color[1],
-                    stroke.color[2],
-                    (base_alpha as f32 * 0.85) as u8,
-                );
-                let poly_pts: Vec<Pos2> = smooth_pts.iter().map(|(p, _, _)| *p).collect();
-
-                painter.add(egui::Shape::line(poly_pts.clone(), Stroke::new(w, pencil_color)));
-                if let Some(&first) = poly_pts.first() {
-                    painter.circle_filled(first, w * 0.5, pencil_color);
-                }
-                if let Some(&last) = poly_pts.last() {
-                    painter.circle_filled(last, w * 0.5, pencil_color);
-                }
-            }
-            PenType::Fountain => {
-                // Dynamic Ribbon Mesh based on calculated dynamic thickness from C++ PenDynamics
-                Self::render_variable_width_ribbon(painter, &smooth_pts, stroke.size, scale, color);
+                Self::render_variable_width_ribbon(painter, &smooth_pts, stroke.size, scale, draw_color);
             }
             PenType::Calligraphy => {
                 let angle = std::f32::consts::FRAC_PI_4; // 45 degree chisel
@@ -516,14 +489,19 @@ impl NoteRenderer {
             painter.add(egui::Shape::Mesh(mesh));
         }
 
-        // Cap ends
-        if let Some(&(p_start, _, _)) = smooth_pts.first() {
-            let th = (smooth_pts[0].2 * scale * 0.5).max(1.0);
-            painter.circle_filled(p_start, th, color);
+        // Antialiased boundary line for crisp edges
+        let edge_stroke = Stroke::new(0.75_f32, color);
+        painter.add(egui::Shape::line(left_pts, edge_stroke));
+        painter.add(egui::Shape::line(right_pts, edge_stroke));
+
+        // Smooth round end caps
+        if let Some(&(p_start, _, th)) = smooth_pts.first() {
+            let r = if th > 0.01 { (th * scale * 0.5).max(0.6) } else { (base_size * scale * 0.4).max(0.6) };
+            painter.circle_filled(p_start, r, color);
         }
-        if let Some(&(p_end, _, _)) = smooth_pts.last() {
-            let th = (smooth_pts[n - 1].2 * scale * 0.5).max(1.0);
-            painter.circle_filled(p_end, th, color);
+        if let Some(&(p_end, _, th)) = smooth_pts.last() {
+            let r = if th > 0.01 { (th * scale * 0.5).max(0.6) } else { (base_size * scale * 0.4).max(0.6) };
+            painter.circle_filled(p_end, r, color);
         }
     }
 

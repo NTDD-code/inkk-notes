@@ -966,12 +966,13 @@ impl eframe::App for HandNoteApp {
                                         self.current_pressure = f.clamp(0.05, 1.0);
                                         self.current_pressure
                                     } else {
-                                        // Speed-based dynamic tapering fallback
-                                        let dt = self.last_pointer_time.elapsed().as_secs_f32().max(0.001);
+                                        // Speed-based dynamic tapering: phản hồi nhạy theo tốc độ lướt tay
+                                        let dt = self.last_pointer_time.elapsed().as_secs_f32().clamp(0.001, 0.05);
                                         let dist = (bounded_x - self.last_pointer_pos_world.x).hypot(bounded_y - self.last_pointer_pos_world.y);
-                                        let speed = (dist * self.scale) / dt;
-                                        let target = (0.90 - (speed / 1600.0) * 0.50).clamp(0.20, 1.0);
-                                        self.current_pressure = self.current_pressure * 0.65 + target * 0.35;
+                                        let speed = dist / dt; // world pixels per sec
+                                        // Nét lướt nhanh thanh thoát (0.35x), dừng lại nhấn đậm (1.0x)
+                                        let target = (1.0 - (speed / 1800.0) * 0.65).clamp(0.25, 1.0);
+                                        self.current_pressure = self.current_pressure * 0.50 + target * 0.50;
                                         self.current_pressure
                                     };
                                     self.last_pointer_time = std::time::Instant::now();

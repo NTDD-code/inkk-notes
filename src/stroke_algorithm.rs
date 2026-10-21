@@ -10,25 +10,27 @@ use crate::model::{PenType, Point};
 
 const PI: f32 = std::f32::consts::PI;
 
-// --- One-Euro filter tuning (from C++ StrokeAlgorithm.cpp) ---
-const ONE_EURO_MIN_CUTOFF: f32 = 0.8;
-const ONE_EURO_BETA: f32 = 0.020;
-const ONE_EURO_DCUTOFF: f32 = 1.2;
+// --- One-Euro filter tuning ---
+// Tăng ONE_EURO_BETA và MIN_CUTOFF để bút phản hồi tức thì, không bị lag/trễ khiến cảm giác viết bị "cứng đơ"
+const ONE_EURO_MIN_CUTOFF: f32 = 1.2;
+const ONE_EURO_BETA: f32 = 0.045;
+const ONE_EURO_DCUTOFF: f32 = 1.5;
 
 // --- Corner protection (base at 96 DPI / 100% scale) ---
-const CORNER_MIN_DIST_BASE: f32 = 2.0;
-const CORNER_COS_THRESHOLD: f32 = -0.2; // angle > 100 degrees (sharp corners only)
-const CORNER_CUTOFF_BOOST: f32 = 4.0; // gentle boost, avoiding sudden jitter
+const CORNER_MIN_DIST_BASE: f32 = 1.8;
+const CORNER_COS_THRESHOLD: f32 = -0.15; // Phản xạ góc nhạy hơn
+const CORNER_CUTOFF_BOOST: f32 = 5.0; // Boost nhanh khi quẹo góc chữ
 
 // --- Decimation (base at 96 DPI / 100% scale) ---
-const DECIMATE_MIN_DIST_BASE: f32 = 0.25;
-const DECIMATE_SPEED_SLOPE_BASE: f32 = 0.8;
+// Giảm ngưỡng decimation để thu nhiều vi điểm hơn ở các khúc lượn cong
+const DECIMATE_MIN_DIST_BASE: f32 = 0.15;
+const DECIMATE_SPEED_SLOPE_BASE: f32 = 0.5;
 
 // --- Speed normalization reference (base at 96 DPI) ---
-const SPEED_REFERENCE_BASE: f32 = 900.0;
+const SPEED_REFERENCE_BASE: f32 = 1100.0;
 
 // dt clamps (seconds)
-const DT_MIN: f32 = 1.0 / 500.0; // 2ms (fastest plausible sample gap)
+const DT_MIN: f32 = 1.0 / 1000.0; // 1ms
 const DT_MAX: f32 = 1.0 / 20.0; // 50ms (stalled gap)
 
 #[inline]
@@ -40,26 +42,38 @@ fn lowpass_alpha(cutoff_hz: f32, dt: f32) -> f32 {
     1.0 / (1.0 + tau / dt)
 }
 
-/// Dynamic thickness based on pen physics model (matching C++ PenDynamics::ComputeThickness)
+/// Dynamic thickness based on pen physics model
+/// Tạo ra nét thanh nét đậm tự nhiên: Viết nhanh thì thanh mảnh vuốt nhọn, viết chậm/nhấn thì đậm đà
 pub fn compute_thickness(
     pen_type: PenType,
     base_thickness: f32,
     speed_factor: f32,
     pressure: f32,
 ) -> f32 {
+    let p = pressure.clamp(0.05, 1.0);
     match pen_type {
-        PenType::Fountain => {
-            // Speed thinning + pressure expansion
-            let v_factor = 1.25 - speed_factor * 0.6;
-            let p_factor = 0.8 + pressure * 0.4;
-            base_thickness * v_factor * p_factor
+        PenType::Ballpoint => {
+            // Bút bi chất lượng cao: Tốc độ cao thì hơi thanh (0.75x), nhấn mạnh thì nở nét (1.25x)
+            let v_factor = 1.15 - speed_factor * 0.40;
+            let p_factor = 0.70 + p * 0.60;
+            (base_thickness * v_factor * p_factor).max(0.6)
         }
-        PenType::Pencil => base_thickness * (0.8 + pressure * 0.3),
+        PenType::Fountain => {
+            // Bút máy: Độ biến thiên rất nhạy, thanh mảnh ở đỉnh chữ, đậm ở bụng chữ
+            let v_factor = 1.30 - speed_factor * 0.65;
+            let p_factor = 0.55 + p * 0.85;
+            (base_thickness * v_factor * p_factor).max(0.5)
+        }
+        PenType::Pencil => {
+            let v_factor = 1.10 - speed_factor * 0.25;
+            let p_factor = 0.65 + p * 0.55;
+            (base_thickness * v_factor * p_factor).max(0.6)
+        }
         PenType::Highlighter => base_thickness,
-        PenType::Ballpoint => base_thickness * (0.9 + pressure * 0.2),
         PenType::Calligraphy => {
-            // Broad chisel variation
-            base_thickness * (0.85 + pressure * 0.65)
+            // Nét bút vát
+            let p_factor = 0.75 + p * 0.55;
+            base_thickness * p_factor
         }
     }
 }
