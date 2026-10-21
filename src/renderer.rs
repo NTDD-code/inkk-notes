@@ -458,7 +458,70 @@ impl NoteRenderer {
         }
     }
 
-    /// Renders variable width strokes (Fountain pen) with normal expansion
+    /// === ELASTIC TAIL (Port từ C++ Renderer.cpp) ===
+    /// "Sticks" ink to mouse. Triệt tiêu 100% cảm giác trễ (lag),
+    /// gắn chặt đầu nét mực vào đúng đầu ngòi chuột trong thời gian thực!
+    pub fn render_elastic_tail<F>(
+        painter: &Painter,
+        stroke: &NoteStroke,
+        raw_cursor_screen: Pos2,
+        scale: f32,
+        to_screen: &F,
+    ) where
+        F: Fn(Pos2) -> Pos2,
+    {
+        if stroke.shape_type != ShapeType::None || stroke.points.is_empty() {
+            return;
+        }
+
+        let pts = &stroke.points;
+        let n = pts.len();
+        let last_pt = pts[n - 1];
+        let end = to_screen(Pos2::new(last_pt.x, last_pt.y));
+        let raw = raw_cursor_screen;
+
+        let dx = raw.x - end.x;
+        let dy = raw.y - end.y;
+        if dx * dx + dy * dy > 0.64 {
+            // Control point: Phóng tiếp tuyến từ đoạn cuối ra phía trước (30% strength)
+            let ctrl = if n >= 2 {
+                let p_penult = to_screen(Pos2::new(pts[n - 2].x, pts[n - 2].y));
+                let vx = end.x - p_penult.x;
+                let vy = end.y - p_penult.y;
+                Pos2::new(end.x + vx * 0.3, end.y + vy * 0.3)
+            } else {
+                end
+            };
+
+            // Vẽ đường nối cong Quadratic Bezier từ điểm cuối nét mực dính vào đầu con trỏ
+            let steps = 8;
+            let mut tail_pts = Vec::with_capacity(steps + 1);
+            for s in 0..=steps {
+                let t = s as f32 / steps as f32;
+                let omt = 1.0 - t;
+                let x = omt * omt * end.x + 2.0 * omt * t * ctrl.x + t * t * raw.x;
+                let y = omt * omt * end.y + 2.0 * omt * t * ctrl.y + t * t * raw.y;
+                tail_pts.push(Pos2::new(x, y));
+            }
+
+            let base_alpha = (stroke.opacity * 255.0) as u8;
+            let color = Color32::from_rgba_unmultiplied(
+                stroke.color[0],
+                stroke.color[1],
+                stroke.color[2],
+                base_alpha,
+            );
+
+            let th = if last_pt.thickness > 0.01 {
+                (last_pt.thickness * scale * 0.9).max(1.0)
+            } else {
+                (stroke.size * scale * 0.85).max(1.0)
+            };
+
+            painter.add(egui::Shape::line(tail_pts, Stroke::new(th, color)));
+            painter.circle_filled(raw, th * 0.5, color);
+        }
+    }
     fn render_variable_width_ribbon(
         painter: &Painter,
         smooth_pts: &[(Pos2, f32, f32)],

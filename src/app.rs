@@ -773,6 +773,16 @@ impl eframe::App for HandNoteApp {
                     }
                 }
 
+                // === ELASTIC TAIL: Bắt dính ngòi mực vào đúng đầu chuột thời gian thực (giống Renderer.cpp) ===
+                if let Some(ref cur) = self.current_stroke {
+                    let pointer = ui.input(|i| i.pointer.clone());
+                    if let Some(raw_cursor) = pointer.interact_pos().or(pointer.latest_pos()) {
+                        NoteRenderer::render_elastic_tail(&page_painter, cur, raw_cursor, scale, &to_screen);
+                    }
+                    // Yêu cầu egui repaint ngay lập tức trong frame tiếp theo để không rơi rụng vi điểm nào
+                    ctx.request_repaint();
+                }
+
                 // 3. Render Lasso Selection Visuals
                 // 3a. In-progress Lasso Path
                 if self.tool == ToolMode::LassoSelect && self.lasso_points.len() >= 2 {
