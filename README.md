@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/pixel/banner.svg" alt="HandNote" width="640">
+<img src="https://github.com/NTDD-code/inkk-notes/tree/main/assets/assets/pixel/banner.svg" alt="HandNote" width="640">
 
 ![Rust](https://img.shields.io/badge/Rust-100%25-dea584?logo=rust&logoColor=white)
 ![Platform](https://img.shields.io/badge/Windows%20%7C%20Linux-native-4c8bf5)
