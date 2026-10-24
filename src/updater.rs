@@ -61,6 +61,7 @@ impl Default for UpdaterConfig {
 pub struct UpdaterState {
     pub status: Arc<Mutex<UpdateStatus>>,
     pub is_dialog_open: bool,
+    pub has_prompted_auto: bool,
     pub config: UpdaterConfig,
 }
 
@@ -76,6 +77,7 @@ impl UpdaterState {
         Self {
             status: Arc::new(Mutex::new(UpdateStatus::Idle)),
             is_dialog_open: false,
+            has_prompted_auto: false,
             config,
         }
     }
@@ -164,8 +166,17 @@ impl UpdaterState {
         }
     }
 
-    /// Render update modal dialog if open
+    /// Render update modal dialog if open or if an update was found in the background
     pub fn render(&mut self, ctx: &egui::Context) {
+        if !self.is_dialog_open && !self.has_prompted_auto {
+            if let Ok(st) = self.status.lock() {
+                if matches!(*st, UpdateStatus::UpdateAvailable(_)) {
+                    self.is_dialog_open = true;
+                    self.has_prompted_auto = true;
+                }
+            }
+        }
+
         if !self.is_dialog_open {
             return;
         }
