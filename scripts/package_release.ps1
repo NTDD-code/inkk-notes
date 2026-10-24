@@ -45,8 +45,10 @@ if (Test-Path $AssetsDir) {
     Copy-Item $AssetsDir (Join-Path $BundleDir "assets") -Recurse -Force
 }
 
-# Copy documentation and update manifest
+# Copy documentation, licenses and update manifest
 Copy-Item (Join-Path $ProjectRoot "packaging\README.txt") (Join-Path $BundleDir "README.txt") -Force
+Copy-Item (Join-Path $ProjectRoot "LICENSE-MIT") (Join-Path $BundleDir "LICENSE-MIT") -Force
+Copy-Item (Join-Path $ProjectRoot "LICENSE-APACHE") (Join-Path $BundleDir "LICENSE-APACHE") -Force
 Copy-Item (Join-Path $ProjectRoot "packaging\update_manifest.json") (Join-Path $BundleDir "update_manifest.json") -Force
 
 # 4. Generate SHA256 checksum

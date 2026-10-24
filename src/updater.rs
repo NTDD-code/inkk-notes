@@ -13,7 +13,7 @@ pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Default update manifest URL for Inkk official releases
 pub const DEFAULT_UPDATE_URL: &str =
-    "https://raw.githubusercontent.com/NTDD-code/inkk/main/packaging/update_manifest.json";
+    "https://raw.githubusercontent.com/NTDD-code/inkk-notes/main/packaging/update_manifest.json";
 
 /// Parsed remote update manifest structure
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
