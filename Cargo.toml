@@ -17,3 +17,6 @@ resvg = "0.44"
 tiny-skia = "0.11"
 pdf-writer = "0.15"
 thiserror = "1.0"
+
+[build-dependencies]
+winres = "0.1.12"
