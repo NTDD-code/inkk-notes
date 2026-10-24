@@ -65,17 +65,48 @@ $ManifestJson | Add-Member -NotePropertyName "sha256" -NotePropertyValue $Hash -
 $ManifestJson | ConvertTo-Json -Depth 5 | Out-File -FilePath $ManifestPath -Encoding utf8
 Copy-Item $ManifestPath (Join-Path $ProjectRoot "packaging\update_manifest.json") -Force
 
-# 5. Compress into ZIP bundle
-Write-Host "`n[4/4] Creating distribution ZIP archive..." -ForegroundColor Yellow
+# 5. Compress into ZIP bundle (Portable edition)
+Write-Host "`n[4/5] Creating distribution ZIP archive..." -ForegroundColor Yellow
 $ZipPath = Join-Path $DistRoot "$BundleName.zip"
 if (Test-Path $ZipPath) {
     Remove-Item $ZipPath -Force
 }
 Compress-Archive -Path "$BundleDir\*" -DestinationPath $ZipPath -CompressionLevel Optimal
 
+# 6. Build Professional Windows Setup Installer (.exe) with Inno Setup
+Write-Host "`n[5/5] Building Professional Windows Setup Installer (.exe)..." -ForegroundColor Yellow
+$IsccCandidates = @(
+    "C:\Users\Lenovo\AppData\Local\Programs\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+)
+
+$IsccPath = $null
+foreach ($cand in $IsccCandidates) {
+    if (Test-Path $cand) {
+        $IsccPath = $cand
+        break
+    }
+}
+
+$SetupExePath = $null
+if ($IsccPath) {
+    Write-Host "Found Inno Setup Compiler at: $IsccPath" -ForegroundColor Gray
+    $IssScript = Join-Path $ProjectRoot "packaging\installer.iss"
+    & $IsccPath $IssScript
+    $SetupExePath = Join-Path $DistRoot "Inkk-v$Version-Setup.exe"
+} else {
+    Write-Warning "Inno Setup (ISCC.exe) not found. Skipping .exe installer generation."
+}
+
 Write-Host "`n=================================================" -ForegroundColor Green
-Write-Host "  SUCCESS! Release package generated:" -ForegroundColor Green
-Write-Host "  Directory: $BundleDir" -ForegroundColor White
-Write-Host "  Zip Bundle: $ZipPath" -ForegroundColor White
-Write-Host "  SHA256:    $Hash" -ForegroundColor White
+Write-Host "  SUCCESS! Release packages generated:" -ForegroundColor Green
+Write-Host "  Portable Directory: $BundleDir" -ForegroundColor White
+Write-Host "  Portable ZIP:       $ZipPath" -ForegroundColor White
+if ($SetupExePath -and (Test-Path $SetupExePath)) {
+    $SetupHash = (Get-FileHash -Path $SetupExePath -Algorithm SHA256).Hash
+    Write-Host "  Setup Installer:    $SetupExePath" -ForegroundColor White
+    Write-Host "  Installer SHA256:   $SetupHash" -ForegroundColor White
+}
 Write-Host "=================================================" -ForegroundColor Green
