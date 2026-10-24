@@ -1,9 +1,9 @@
 ﻿{
-    "version":  "0.1.0",
+    "version":  "0.1.1",
     "release_date":  "2026-10-24",
-    "title":  "Inkk 0.1.0",
-    "release_notes":  "Welcome to Inkk!",
+    "title":  "Inkk 0.1.1",
+    "release_notes":  "Welcome to Inkk!\n- Copy \u0026 Paste handwriting strokes and canvas objects (Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+D)\n- Move \u0026 reorder pages with dedicated controls and shortcuts (Alt+Up / Alt+Down)\n- Whiteboard space-pan: Hold Space and drag to navigate whiteboard view freely\n- Select All (Ctrl+A) and quick context menu actions",
     "download_url":  "https://github.com/NTDD-code/inkk-notes/releases/latest",
     "mandatory":  false,
-    "sha256":  "695ECB9AAF3DF968665E16B24165131F025314FF6544D70DEF589AD2D9425E6D"
+    "sha256":  "CE37C0AE14BC12CCEB08A5EE084E9EF2568A4598BC9670016C2D131D600D53F7"
 }

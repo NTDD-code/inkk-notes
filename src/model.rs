@@ -976,6 +976,90 @@ impl Notebook {
             self.current_page_index -= 1;
         }
     }
+
+    /// Move page at `idx` up (earlier in document), swapping with `idx - 1`.
+    pub fn move_page_up(&mut self, idx: usize) -> bool {
+        if idx > 0 && idx < self.pages.len() {
+            self.pages.swap(idx, idx - 1);
+            if self.current_page_index == idx {
+                self.current_page_index = idx - 1;
+            } else if self.current_page_index == idx - 1 {
+                self.current_page_index = idx;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move page at `idx` down (later in document), swapping with `idx + 1`.
+    pub fn move_page_down(&mut self, idx: usize) -> bool {
+        if idx + 1 < self.pages.len() {
+            self.pages.swap(idx, idx + 1);
+            if self.current_page_index == idx {
+                self.current_page_index = idx + 1;
+            } else if self.current_page_index == idx + 1 {
+                self.current_page_index = idx;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move page from index `from` to index `to`.
+    pub fn move_page(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.pages.len() || to >= self.pages.len() || from == to {
+            return false;
+        }
+        let page = self.pages.remove(from);
+        self.pages.insert(to, page);
+        if self.current_page_index == from {
+            self.current_page_index = to;
+        } else if from < self.current_page_index && to >= self.current_page_index {
+            self.current_page_index -= 1;
+        } else if from > self.current_page_index && to <= self.current_page_index {
+            self.current_page_index += 1;
+        }
+        true
+    }
+}
+
+/// Serialized clipboard bundle representing copied strokes and canvas elements
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InkkClipboardBundle {
+    #[serde(default = "default_inkk_signature")]
+    pub inkk_signature: String,
+    #[serde(default)]
+    pub strokes: Vec<Stroke>,
+    #[serde(default)]
+    pub images: Vec<ImageEntity>,
+    #[serde(default)]
+    pub plots: Vec<PlotEntity>,
+    #[serde(default)]
+    pub matrices: Vec<MatrixEntity>,
+    #[serde(default)]
+    pub grids: Vec<TableGridEntity>,
+    #[serde(default)]
+    pub flowcharts: Vec<FlowchartEntity>,
+}
+
+impl Default for InkkClipboardBundle {
+    fn default() -> Self {
+        Self {
+            inkk_signature: default_inkk_signature(),
+            strokes: Vec::new(),
+            images: Vec::new(),
+            plots: Vec::new(),
+            matrices: Vec::new(),
+            grids: Vec::new(),
+            flowcharts: Vec::new(),
+        }
+    }
+}
+
+fn default_inkk_signature() -> String {
+    "inkk_clipboard_v1".to_string()
 }
 
 #[cfg(test)]
@@ -1200,5 +1284,54 @@ mod tests {
         assert!(deserialized.flowcharts[0]
             .dsl_source
             .contains("Hello Flowchart"));
+    }
+
+    #[test]
+    fn test_notebook_page_reordering() {
+        let mut notebook = Notebook::new("Test Notebook");
+        notebook.pages[0].id = "page_0".to_string();
+        notebook.add_page();
+        notebook.pages[1].id = "page_1".to_string();
+        notebook.add_page();
+        notebook.pages[2].id = "page_2".to_string();
+
+        assert_eq!(notebook.pages.len(), 3);
+        assert_eq!(notebook.pages[0].id, "page_0");
+        assert_eq!(notebook.pages[1].id, "page_1");
+        assert_eq!(notebook.pages[2].id, "page_2");
+
+        // Move page 2 up -> should swap with page 1
+        assert!(notebook.move_page_up(2));
+        assert_eq!(notebook.pages[0].id, "page_0");
+        assert_eq!(notebook.pages[1].id, "page_2");
+        assert_eq!(notebook.pages[2].id, "page_1");
+
+        // Move page 0 down -> should swap with page 1
+        assert!(notebook.move_page_down(0));
+        assert_eq!(notebook.pages[0].id, "page_2");
+        assert_eq!(notebook.pages[1].id, "page_0");
+        assert_eq!(notebook.pages[2].id, "page_1");
+    }
+
+    #[test]
+    fn test_clipboard_bundle_serde() {
+        let mut bundle = InkkClipboardBundle::default();
+        bundle.strokes.push(Stroke {
+            id: "s1".to_string(),
+            pen_type: PenType::Ballpoint,
+            shape_type: ShapeType::None,
+            is_filled: false,
+            color: [255, 0, 0, 255],
+            original_color: None,
+            size: 4.0,
+            opacity: 1.0,
+            points: vec![Point { x: 10.0, y: 20.0, pressure: 0.8, thickness: 2.0 }],
+        });
+
+        let json = serde_json::to_string(&bundle).unwrap();
+        assert!(json.contains("inkk_clipboard_v1"));
+        let parsed: InkkClipboardBundle = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.strokes.len(), 1);
+        assert_eq!(parsed.strokes[0].id, "s1");
     }
 }

@@ -285,6 +285,7 @@ pub struct InkkApp {
     initial_matrix_rects: Vec<(String, f32, f32, f32, f32)>,
     initial_grid_rects: Vec<(String, f32, f32, f32, f32)>,
     initial_flowchart_rects: Vec<(String, f32, f32, f32, f32)>,
+    internal_clipboard: Option<crate::model::InkkClipboardBundle>,
 
     // Image textures cache
     image_textures: HashMap<String, egui::TextureHandle>,
@@ -408,6 +409,7 @@ impl Default for InkkApp {
             initial_matrix_rects: Vec::new(),
             initial_grid_rects: Vec::new(),
             initial_flowchart_rects: Vec::new(),
+            internal_clipboard: None,
             image_textures: HashMap::new(),
             math_studio: MathStudioState::default(),
             matrix_dialog: crate::ui_dialogs::MatrixDialogState::default(),
@@ -818,6 +820,288 @@ impl InkkApp {
         }
     }
 
+    fn copy_selected(&mut self) -> bool {
+        let has_sel = !self.selected_stroke_ids.is_empty()
+            || !self.selected_image_ids.is_empty()
+            || !self.selected_plot_ids.is_empty()
+            || !self.selected_matrix_ids.is_empty()
+            || !self.selected_grid_ids.is_empty()
+            || !self.selected_flowchart_ids.is_empty();
+
+        let page = self.notebook.current_page();
+
+        let (strokes, images, plots, matrices, grids, flowcharts) = if has_sel {
+            (
+                page.strokes.iter().filter(|s| self.selected_stroke_ids.contains(&s.id)).cloned().collect::<Vec<_>>(),
+                page.images.iter().filter(|i| self.selected_image_ids.contains(&i.id)).cloned().collect::<Vec<_>>(),
+                page.plots.iter().filter(|p| self.selected_plot_ids.contains(&p.id)).cloned().collect::<Vec<_>>(),
+                page.matrices.iter().filter(|m| self.selected_matrix_ids.contains(&m.id)).cloned().collect::<Vec<_>>(),
+                page.grids.iter().filter(|g| self.selected_grid_ids.contains(&g.id)).cloned().collect::<Vec<_>>(),
+                page.flowcharts.iter().filter(|f| self.selected_flowchart_ids.contains(&f.id)).cloned().collect::<Vec<_>>(),
+            )
+        } else {
+            if page.strokes.is_empty()
+                && page.images.is_empty()
+                && page.plots.is_empty()
+                && page.matrices.is_empty()
+                && page.grids.is_empty()
+                && page.flowcharts.is_empty()
+            {
+                self.set_status("Nothing to copy. Draw strokes or use Lasso (7) to select. 💡");
+                return false;
+            }
+            (
+                page.strokes.clone(),
+                page.images.clone(),
+                page.plots.clone(),
+                page.matrices.clone(),
+                page.grids.clone(),
+                page.flowcharts.clone(),
+            )
+        };
+
+        let stroke_count = strokes.len();
+        let total_count = stroke_count + images.len() + plots.len() + matrices.len() + grids.len() + flowcharts.len();
+        if total_count == 0 {
+            self.set_status("Nothing to copy. Select strokes with Lasso (7) first. 💡");
+            return false;
+        }
+
+        let bundle = crate::model::InkkClipboardBundle {
+            inkk_signature: "inkk_clipboard_v1".to_string(),
+            strokes,
+            images,
+            plots,
+            matrices,
+            grids,
+            flowcharts,
+        };
+
+        if let Ok(json_str) = serde_json::to_string(&bundle) {
+            if let Ok(mut clip) = arboard::Clipboard::new() {
+                let _ = clip.set_text(json_str);
+            }
+        }
+
+        self.internal_clipboard = Some(bundle);
+        self.set_status(&format!("Copied {} item(s) ({} stroke(s)) to clipboard! 📋", total_count, stroke_count));
+        true
+    }
+
+    fn cut_selected(&mut self) {
+        if self.copy_selected() {
+            self.delete_selected();
+            self.set_status("Cut selected item(s) to clipboard! ✂");
+        }
+    }
+
+    fn duplicate_selected(&mut self) {
+        if self.copy_selected() {
+            self.paste_from_clipboard();
+        }
+    }
+
+    fn select_all(&mut self) {
+        let (stroke_ids, img_ids, plot_ids, mat_ids, grid_ids, flow_ids) = {
+            let page = self.notebook.current_page();
+            (
+                page.strokes.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
+                page.images.iter().map(|i| i.id.clone()).collect::<Vec<_>>(),
+                page.plots.iter().map(|p| p.id.clone()).collect::<Vec<_>>(),
+                page.matrices.iter().map(|m| m.id.clone()).collect::<Vec<_>>(),
+                page.grids.iter().map(|g| g.id.clone()).collect::<Vec<_>>(),
+                page.flowcharts.iter().map(|f| f.id.clone()).collect::<Vec<_>>(),
+            )
+        };
+        let stroke_count = stroke_ids.len();
+        let total_count = stroke_count
+            + img_ids.len()
+            + plot_ids.len()
+            + mat_ids.len()
+            + grid_ids.len()
+            + flow_ids.len();
+        if total_count == 0 {
+            self.set_status("Page is empty — nothing to select. ✍");
+            return;
+        }
+        self.clear_selection();
+        self.selected_stroke_ids.extend(stroke_ids);
+        self.selected_image_ids.extend(img_ids);
+        self.selected_plot_ids.extend(plot_ids);
+        self.selected_matrix_ids.extend(mat_ids);
+        self.selected_grid_ids.extend(grid_ids);
+        self.selected_flowchart_ids.extend(flow_ids);
+        self.set_tool(ToolMode::LassoSelect);
+        self.set_status(&format!("Selected all {} items ({} strokes) on page ⛶", total_count, stroke_count));
+    }
+
+    fn paste_bundle(&mut self, bundle: crate::model::InkkClipboardBundle) {
+        let total_count = bundle.strokes.len()
+            + bundle.images.len()
+            + bundle.plots.len()
+            + bundle.matrices.len()
+            + bundle.grids.len()
+            + bundle.flowcharts.len();
+        if total_count == 0 {
+            return;
+        }
+
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+
+        for s in &bundle.strokes {
+            for pt in &s.points {
+                min_x = min_x.min(pt.x);
+                min_y = min_y.min(pt.y);
+                max_x = max_x.max(pt.x);
+                max_y = max_y.max(pt.y);
+            }
+        }
+        for i in &bundle.images {
+            min_x = min_x.min(i.x);
+            min_y = min_y.min(i.y);
+            max_x = max_x.max(i.x + i.width);
+            max_y = max_y.max(i.y + i.height);
+        }
+        for p in &bundle.plots {
+            min_x = min_x.min(p.x);
+            min_y = min_y.min(p.y);
+            max_x = max_x.max(p.x + p.width);
+            max_y = max_y.max(p.y + p.height);
+        }
+        for m in &bundle.matrices {
+            min_x = min_x.min(m.x);
+            min_y = min_y.min(m.y);
+            max_x = max_x.max(m.x + m.width);
+            max_y = max_y.max(m.y + m.height);
+        }
+        for g in &bundle.grids {
+            min_x = min_x.min(g.x);
+            min_y = min_y.min(g.y);
+            let grid_w = g.cols as f32 * g.col_width;
+            let grid_h = g.rows as f32 * g.row_height;
+            max_x = max_x.max(g.x + grid_w);
+            max_y = max_y.max(g.y + grid_h);
+        }
+        for f in &bundle.flowcharts {
+            min_x = min_x.min(f.x);
+            min_y = min_y.min(f.y);
+            max_x = max_x.max(f.x + f.width);
+            max_y = max_y.max(f.y + f.height);
+        }
+
+        let bundle_center = if min_x < max_x && min_y < max_y {
+            Pos2::new((min_x + max_x) * 0.5, (min_y + max_y) * 0.5)
+        } else {
+            Pos2::new(100.0, 100.0)
+        };
+
+        let (page_w, page_h) = {
+            let page = self.notebook.current_page();
+            (page.width, page.height)
+        };
+        let target_pos = if self.last_pointer_pos_world != Pos2::ZERO
+            && self.last_pointer_pos_world.x >= 0.0
+            && self.last_pointer_pos_world.x <= page_w
+            && self.last_pointer_pos_world.y >= 0.0
+            && self.last_pointer_pos_world.y <= page_h
+        {
+            self.last_pointer_pos_world
+        } else {
+            bundle_center + Vec2::new(30.0, 30.0)
+        };
+
+        let offset = target_pos - bundle_center;
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+
+        self.clear_selection();
+
+        let mut pasted_strokes = 0;
+        {
+            let page = self.notebook.current_page_mut();
+            for (idx, mut s) in bundle.strokes.into_iter().enumerate() {
+                s.id = format!("stroke_{}_{}", ts, idx);
+                for pt in &mut s.points {
+                    pt.x += offset.x;
+                    pt.y += offset.y;
+                }
+                let id = s.id.clone();
+                page.strokes.push(s);
+                self.selected_stroke_ids.insert(id);
+                pasted_strokes += 1;
+            }
+
+            for (idx, mut img) in bundle.images.into_iter().enumerate() {
+                img.id = format!("img_{}_{}", ts, idx);
+                img.x += offset.x;
+                img.y += offset.y;
+                let id = img.id.clone();
+                page.images.push(img);
+                self.selected_image_ids.insert(id);
+            }
+
+            for (idx, mut p) in bundle.plots.into_iter().enumerate() {
+                p.id = format!("plot_{}_{}", ts, idx);
+                p.x += offset.x;
+                p.y += offset.y;
+                let id = p.id.clone();
+                page.plots.push(p);
+                self.selected_plot_ids.insert(id);
+            }
+
+            for (idx, mut m) in bundle.matrices.into_iter().enumerate() {
+                m.id = format!("mat_{}_{}", ts, idx);
+                m.x += offset.x;
+                m.y += offset.y;
+                let id = m.id.clone();
+                page.matrices.push(m);
+                self.selected_matrix_ids.insert(id);
+            }
+
+            for (idx, mut g) in bundle.grids.into_iter().enumerate() {
+                g.id = format!("grid_{}_{}", ts, idx);
+                g.x += offset.x;
+                g.y += offset.y;
+                let id = g.id.clone();
+                page.grids.push(g);
+                self.selected_grid_ids.insert(id);
+            }
+
+            for (idx, mut f) in bundle.flowcharts.into_iter().enumerate() {
+                f.id = format!("flow_{}_{}", ts, idx);
+                f.x += offset.x;
+                f.y += offset.y;
+                let id = f.id.clone();
+                page.flowcharts.push(f);
+                self.selected_flowchart_ids.insert(id);
+            }
+        }
+
+        if let Some(bounds) = self.get_selection_bounds() {
+            self.notebook.current_page_mut().check_auto_expand(bounds.max.y + 100.0);
+        }
+
+        self.set_tool(ToolMode::LassoSelect);
+        self.autosave.mark_dirty();
+        self.set_status(&format!(
+            "Pasted {} item(s) ({} stroke(s)) onto canvas! 📋",
+            total_count, pasted_strokes
+        ));
+    }
+
+    fn center_page_in_view(&mut self, available_size: Vec2) {
+        let page = self.notebook.current_page();
+        let target_x = ((available_size.x - page.width * self.scale) * 0.5).max(40.0);
+        let target_y = ((available_size.y - page.height * self.scale) * 0.5).max(40.0);
+        self.pan = Vec2::new(target_x, target_y);
+        self.set_status("Canvas centered on page 🎯");
+    }
+
     fn delete_selected(&mut self) {
         if self.selected_stroke_ids.is_empty()
             && self.selected_image_ids.is_empty()
@@ -1135,6 +1419,25 @@ impl InkkApp {
     }
 
     fn paste_from_clipboard(&mut self) {
+        // 0. Check for Inkk stroke/bundle clipboard (from system clipboard or internal buffer)
+        let mut bundle_from_clip = None;
+        if let Ok(mut clip) = arboard::Clipboard::new() {
+            if let Ok(text) = clip.get_text() {
+                if text.contains("\"inkk_signature\":\"inkk_clipboard_v1\"")
+                    || text.contains("\"inkk_signature\": \"inkk_clipboard_v1\"")
+                {
+                    if let Ok(bundle) = serde_json::from_str::<crate::model::InkkClipboardBundle>(&text) {
+                        bundle_from_clip = Some(bundle);
+                    }
+                }
+            }
+        }
+
+        if let Some(bundle) = bundle_from_clip.or_else(|| self.internal_clipboard.clone()) {
+            self.paste_bundle(bundle);
+            return;
+        }
+
         // 1. Check Windows Explorer copied files (CF_HDROP)
         let explorer_files = get_clipboard_files_windows();
         if !explorer_files.is_empty() {
@@ -1823,6 +2126,32 @@ impl InkkApp {
             {
                 self.go_to_page(cur_idx + 1);
             }
+            let can_move_cur_up = cur_idx > 0;
+            if ui
+                .add_enabled_ui(can_move_cur_up, |ui| {
+                    widgets::tool_button(ui, &p, "▲", false, "Move current page earlier (Ctrl+Shift+PgUp)")
+                })
+                .inner
+                .clicked()
+            {
+                if self.notebook.move_page_up(cur_idx) {
+                    self.set_status(&format!("Moved page to position {} 📄", cur_idx));
+                    self.autosave.mark_dirty();
+                }
+            }
+            let can_move_cur_down = cur_idx + 1 < total;
+            if ui
+                .add_enabled_ui(can_move_cur_down, |ui| {
+                    widgets::tool_button(ui, &p, "▼", false, "Move current page later (Ctrl+Shift+PgDn)")
+                })
+                .inner
+                .clicked()
+            {
+                if self.notebook.move_page_down(cur_idx) {
+                    self.set_status(&format!("Moved page to position {} 📄", cur_idx + 2));
+                    self.autosave.mark_dirty();
+                }
+            }
             if widgets::tool_button(ui, &p, theme::icon::ADD, false, "Add page after this one")
                 .clicked()
             {
@@ -1949,6 +2278,8 @@ impl InkkApp {
                 // Page mutations are deferred until after the loop so indices stay valid.
                 enum PageAction {
                     Select(usize),
+                    MoveUp(usize),
+                    MoveDown(usize),
                     Duplicate(usize),
                     Delete(usize),
                 }
@@ -2043,6 +2374,38 @@ impl InkkApp {
                                         {
                                             action = Some(PageAction::Duplicate(idx));
                                         }
+                                        let can_move_down = idx + 1 < total;
+                                        if ui
+                                            .add_enabled_ui(can_move_down, |ui| {
+                                                widgets::tool_button(
+                                                    ui,
+                                                    &p,
+                                                    "▼",
+                                                    false,
+                                                    "Move page down (later in document)",
+                                                )
+                                            })
+                                            .inner
+                                            .clicked()
+                                        {
+                                            action = Some(PageAction::MoveDown(idx));
+                                        }
+                                        let can_move_up = idx > 0;
+                                        if ui
+                                            .add_enabled_ui(can_move_up, |ui| {
+                                                widgets::tool_button(
+                                                    ui,
+                                                    &p,
+                                                    "▲",
+                                                    false,
+                                                    "Move page up (earlier in document)",
+                                                )
+                                            })
+                                            .inner
+                                            .clicked()
+                                        {
+                                            action = Some(PageAction::MoveUp(idx));
+                                        }
                                     },
                                 );
                             });
@@ -2052,6 +2415,18 @@ impl InkkApp {
 
                 match action {
                     Some(PageAction::Select(idx)) => self.go_to_page(idx),
+                    Some(PageAction::MoveUp(idx)) => {
+                        if self.notebook.move_page_up(idx) {
+                            self.set_status(&format!("Moved page {} earlier to position {}", idx + 1, idx));
+                            self.autosave.mark_dirty();
+                        }
+                    }
+                    Some(PageAction::MoveDown(idx)) => {
+                        if self.notebook.move_page_down(idx) {
+                            self.set_status(&format!("Moved page {} later to position {}", idx + 1, idx + 2));
+                            self.autosave.mark_dirty();
+                        }
+                    }
                     Some(PageAction::Duplicate(idx)) => {
                         self.go_to_page(idx);
                         self.notebook.duplicate_current_page();
@@ -2638,13 +3013,40 @@ impl InkkApp {
         {
             self.prompt_export_pdf();
         }
-        if pressed(Modifiers::COMMAND, Key::V) {
+        if self.shortcut_manager.is_triggered(ctx, "edit_copy")
+            || pressed(Modifiers::COMMAND, Key::C)
+        {
+            self.copy_selected();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "edit_cut")
+            || pressed(Modifiers::COMMAND, Key::X)
+        {
+            self.cut_selected();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "edit_duplicate")
+            || pressed(Modifiers::COMMAND, Key::D)
+        {
+            self.duplicate_selected();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "edit_select_all")
+            || pressed(Modifiers::COMMAND, Key::A)
+        {
+            self.select_all();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "edit_paste")
+            || pressed(Modifiers::COMMAND, Key::V)
+        {
             self.paste_from_clipboard();
         }
         if self.shortcut_manager.is_triggered(ctx, "canvas_reset_zoom")
             || pressed(Modifiers::COMMAND, Key::Num0)
         {
             self.zoom_by(1.0 / self.scale, available_size);
+        }
+        if self.shortcut_manager.is_triggered(ctx, "canvas_center_page")
+            || pressed(Modifiers::NONE, Key::Home)
+        {
+            self.center_page_in_view(available_size);
         }
         if self.shortcut_manager.is_triggered(ctx, "edit_delete")
             || pressed(Modifiers::NONE, Key::Delete)
@@ -2659,6 +3061,26 @@ impl InkkApp {
                 .current_page_mut()
                 .text_boxes
                 .retain(|b| !b.text.trim().is_empty());
+        }
+        if self.shortcut_manager.is_triggered(ctx, "nav_move_page_up")
+            || pressed(Modifiers::COMMAND | Modifiers::SHIFT, Key::PageUp)
+            || pressed(Modifiers::ALT, Key::ArrowUp)
+        {
+            let cur = self.notebook.current_page_index;
+            if self.notebook.move_page_up(cur) {
+                self.set_status(&format!("Moved page to position {} 📄", cur));
+                self.autosave.mark_dirty();
+            }
+        }
+        if self.shortcut_manager.is_triggered(ctx, "nav_move_page_down")
+            || pressed(Modifiers::COMMAND | Modifiers::SHIFT, Key::PageDown)
+            || pressed(Modifiers::ALT, Key::ArrowDown)
+        {
+            let cur = self.notebook.current_page_index;
+            if self.notebook.move_page_down(cur) {
+                self.set_status(&format!("Moved page to position {} 📄", cur + 2));
+                self.autosave.mark_dirty();
+            }
         }
         if self.shortcut_manager.is_triggered(ctx, "nav_next_page")
             || pressed(Modifiers::NONE, Key::PageDown)
@@ -3634,10 +4056,19 @@ impl eframe::App for InkkApp {
                     }
                 }
 
-                // Middle mouse drag or Pan tool
-                if (self.tool == ToolMode::Pan && is_primary_down) || pointer.middle_down() {
+                let is_space_down = ctx.input(|i| i.key_down(egui::Key::Space));
+                if is_space_down {
+                    if is_primary_down {
+                        ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+                    } else {
+                        ctx.set_cursor_icon(egui::CursorIcon::Grab);
+                    }
+                }
+
+                // Middle mouse drag, Pan tool, or Space + Left drag (Space pan)
+                if (self.tool == ToolMode::Pan && is_primary_down) || pointer.middle_down() || (is_space_down && is_primary_down) {
                     self.pan += pointer.delta();
-                } else if !ruler_consumed && is_primary_pressed && self.canvas_gesture {
+                } else if !ruler_consumed && !is_space_down && is_primary_pressed && self.canvas_gesture {
                     if let Some(cursor) = pointer_pos {
                         let effective_cursor = self.ruler.snap_point(cursor).unwrap_or(cursor);
                         let world = self.to_world(effective_cursor);
@@ -3960,7 +4391,7 @@ impl eframe::App for InkkApp {
                         }
                     }
                 }
-                } else if !ruler_consumed && is_primary_down {
+                } else if !ruler_consumed && !is_space_down && is_primary_down {
                     if let Some(cursor) = pointer_pos {
                         let effective_cursor = self.ruler.snap_point(cursor).unwrap_or(cursor);
                         let world = self.to_world(effective_cursor);
@@ -4359,10 +4790,17 @@ impl eframe::App for InkkApp {
                 }
 
                 // Right-Click Context Menu for quick access & mouse shortcuts
+                let mut action_copy = false;
+                let mut action_cut = false;
+                let mut action_duplicate = false;
+                let mut action_select_all = false;
                 let mut action_paste = false;
                 let mut action_insert = false;
                 let mut action_delete = false;
                 let mut action_clear_sel = false;
+                let mut action_move_page_up = false;
+                let mut action_move_page_down = false;
+                let mut action_center_page = false;
                 let mut action_set_tool = None;
                 let mut action_toggle_math = false;
                 let mut action_toggle_ruler = false;
@@ -4393,8 +4831,32 @@ impl eframe::App for InkkApp {
                     ui.label(egui::RichText::new("⚙️ Quick Actions Menu").strong().color(p.accent));
                     ui.separator();
 
-                    if ui.button("📋 Paste Image / SVG (Ctrl+V)").clicked() {
+                    if has_selection {
+                        if ui.button("📋 Copy Selected (Ctrl+C)").clicked() {
+                            action_copy = true;
+                            ui.close_menu();
+                        }
+                        if ui.button("✂ Cut Selected (Ctrl+X)").clicked() {
+                            action_cut = true;
+                            ui.close_menu();
+                        }
+                        if ui.button("📑 Duplicate Selected (Ctrl+D)").clicked() {
+                            action_duplicate = true;
+                            ui.close_menu();
+                        }
+                    } else if !self.notebook.current_page().strokes.is_empty() {
+                        if ui.button("📋 Copy All Strokes (Ctrl+C)").clicked() {
+                            action_copy = true;
+                            ui.close_menu();
+                        }
+                    }
+
+                    if ui.button("📋 Paste to Whiteboard (Ctrl+V)").clicked() {
                         action_paste = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("⛶ Select All (Ctrl+A)").clicked() {
+                        action_select_all = true;
                         ui.close_menu();
                     }
                     if ui.button("🖼 Insert Image from file...").clicked() {
@@ -4481,6 +4943,27 @@ impl eframe::App for InkkApp {
                     }
 
                     ui.separator();
+                    ui.label(egui::RichText::new("Page & Position").small().color(p.text_muted));
+                    let cur_idx = self.notebook.current_page_index;
+                    let total_pages = self.notebook.pages.len();
+                    if cur_idx > 0 {
+                        if ui.button("▲ Move Page Earlier (Alt+Up)").clicked() {
+                            action_move_page_up = true;
+                            ui.close_menu();
+                        }
+                    }
+                    if cur_idx + 1 < total_pages {
+                        if ui.button("▼ Move Page Later (Alt+Down)").clicked() {
+                            action_move_page_down = true;
+                            ui.close_menu();
+                        }
+                    }
+                    if ui.button("🎯 Center Page on Screen (Home)").clicked() {
+                        action_center_page = true;
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
                     ui.label(egui::RichText::new("Mouse & Shortcuts").small().color(p.text_muted));
 
                     if ui.button("↩ Undo (Mouse 4 / Ctrl+Z)").clicked() {
@@ -4520,6 +5003,18 @@ impl eframe::App for InkkApp {
                     }
                 });
 
+                if action_copy {
+                    self.copy_selected();
+                }
+                if action_cut {
+                    self.cut_selected();
+                }
+                if action_duplicate {
+                    self.duplicate_selected();
+                }
+                if action_select_all {
+                    self.select_all();
+                }
                 if action_paste {
                     self.paste_from_clipboard();
                 }
@@ -4531,6 +5026,23 @@ impl eframe::App for InkkApp {
                 }
                 if action_clear_sel {
                     self.clear_selection();
+                }
+                if action_move_page_up {
+                    let cur = self.notebook.current_page_index;
+                    if self.notebook.move_page_up(cur) {
+                        self.set_status(&format!("Moved page to position {} 📄", cur));
+                        self.autosave.mark_dirty();
+                    }
+                }
+                if action_move_page_down {
+                    let cur = self.notebook.current_page_index;
+                    if self.notebook.move_page_down(cur) {
+                        self.set_status(&format!("Moved page to position {} 📄", cur + 2));
+                        self.autosave.mark_dirty();
+                    }
+                }
+                if action_center_page {
+                    self.center_page_in_view(available_size);
                 }
                 if let Some(tool) = action_set_tool {
                     self.set_tool(tool);
