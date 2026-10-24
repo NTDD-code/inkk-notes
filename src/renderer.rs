@@ -17,38 +17,47 @@ impl NoteRenderer {
     ) where
         F: Fn(Pos2) -> Pos2,
     {
-        // 1. Page shadow
-        let shadow_rect = page_rect_screen.translate(Vec2::new(0.0, 6.0_f32 * scale.min(1.2_f32)));
-        let shadow_color = if is_dark {
-            Color32::from_black_alpha(100)
+        // 1. Dual-elevation soft floating shadow (Elevation 2)
+        let s1_offset = Vec2::new(0.0, 3.0_f32 * scale.min(1.2_f32));
+        let s2_offset = Vec2::new(0.0, 8.0_f32 * scale.min(1.2_f32));
+        let (s1_color, s2_color) = if is_dark {
+            (
+                Color32::from_black_alpha(80),
+                Color32::from_black_alpha(120),
+            )
         } else {
-            Color32::from_black_alpha(35)
+            (Color32::from_black_alpha(15), Color32::from_black_alpha(25))
         };
-        painter.rect_filled(shadow_rect, 4.0_f32, shadow_color);
+        painter.rect_filled(page_rect_screen.translate(s1_offset), 4.0_f32, s1_color);
+        painter.rect_filled(page_rect_screen.translate(s2_offset), 8.0_f32, s2_color);
 
-        // 2. Page sheet base
+        // 2. Warm paper sheet base
         let page_bg = if is_dark {
-            Color32::from_rgb(34, 38, 44)
+            Color32::from_rgb(36, 33, 29) // Warm brownish-black #24211D
         } else {
-            Color32::from_rgb(255, 255, 255)
+            Color32::from_rgb(255, 253, 249) // Warm ivory paper #FFFDF9
         };
-        painter.rect_filled(page_rect_screen, 2.0_f32, page_bg);
+        painter.rect_filled(page_rect_screen, 3.0_f32, page_bg);
 
-        // 3. Page border
+        // 3. Micro warm paper border
         let border_color = if is_dark {
-            Color32::from_rgb(55, 62, 72)
+            Color32::from_rgb(56, 51, 45) // Warm dark border #38332D
         } else {
-            Color32::from_rgb(215, 225, 235)
+            Color32::from_rgb(226, 218, 207) // Warm subtle border #E2DACF
         };
-        painter.rect_stroke(page_rect_screen, 2.0_f32, Stroke::new(1.0_f32, border_color));
+        painter.rect_stroke(
+            page_rect_screen,
+            3.0_f32,
+            Stroke::new(1.0_f32, border_color),
+        );
 
         // 4. Clip lines inside page
         let page_painter = painter.with_clip_rect(page_rect_screen);
 
         let line_color = if is_dark {
-            Color32::from_rgb(52, 58, 68)
+            Color32::from_rgb(50, 46, 40) // Warm dark line #322E28
         } else {
-            Color32::from_rgb(215, 230, 245)
+            Color32::from_rgb(230, 222, 212) // Warm soft line #E6DFD4
         };
 
         match paper_type {
@@ -66,11 +75,11 @@ impl NoteRenderer {
                     y += spacing;
                 }
 
-                // Vertical red margin line
+                // Vertical red margin line (Inkk signature Brick Red)
                 let margin_color = if is_dark {
-                    Color32::from_rgb(110, 50, 50)
+                    Color32::from_rgb(140, 59, 48) // Warm brick red #8C3B30
                 } else {
-                    Color32::from_rgb(250, 160, 160)
+                    Color32::from_rgb(200, 90, 75) // Signature brick red #C85A4B
                 };
                 let m1 = to_screen(Pos2::new(margin_x, 0.0_f32));
                 let m2 = to_screen(Pos2::new(margin_x, page_height));
@@ -96,9 +105,9 @@ impl NoteRenderer {
             PaperType::DotGrid => {
                 let spacing = 26.0_f32;
                 let dot_color = if is_dark {
-                    Color32::from_rgb(68, 76, 88)
+                    Color32::from_rgb(70, 64, 56)
                 } else {
-                    Color32::from_rgb(200, 210, 222)
+                    Color32::from_rgb(215, 206, 194)
                 };
                 let mut x = spacing;
                 while x < page_width {
@@ -171,7 +180,7 @@ impl NoteRenderer {
     }
 
     /// Mathematical curve smoothing - BALANCED for Native + Smooth
-    /// Đủ mượt để loại jitter nhưng GIỮ độ CRISP, SNAPPY như Scribble Ink
+    /// Äá»§ mÆ°á»£t Ä‘á»ƒ loáº¡i jitter nhÆ°ng GIá»® Ä‘á»™ CRISP, SNAPPY nhÆ° Scribble Ink
     fn generate_smooth_polyline<F>(pts: &[Point], to_screen: &F) -> Vec<(Pos2, f32, f32)>
     where
         F: Fn(Pos2) -> Pos2,
@@ -180,7 +189,7 @@ impl NoteRenderer {
             return Vec::new();
         }
 
-        // BƯỚC 1: Lọc điểm trùng (< 0.9 screen pixel - không quá sát)
+        // BÆ¯á»šC 1: Lá»c Ä‘iá»ƒm trÃ¹ng (< 0.9 screen pixel - khÃ´ng quÃ¡ sÃ¡t)
         let mut screen_pts: Vec<(Pos2, f32, f32)> = Vec::with_capacity(pts.len());
         for p in pts {
             let sp = to_screen(Pos2::new(p.x, p.y));
@@ -216,11 +225,11 @@ impl NoteRenderer {
             return smooth;
         }
 
-        // BƯỚC 2: Midpoint Quadratic Bezier - ÍT STEPS hơn để CRISP
+        // BÆ¯á»šC 2: Midpoint Quadratic Bezier - ÃT STEPS hÆ¡n Ä‘á»ƒ CRISP
         let mut smooth = Vec::with_capacity(n * 6);
         smooth.push(screen_pts[0]);
 
-        // Đoạn đầu
+        // Äoáº¡n Ä‘áº§u
         let mid0 = Pos2::new(
             (screen_pts[0].0.x + screen_pts[1].0.x) * 0.5,
             (screen_pts[0].0.y + screen_pts[1].0.y) * 0.5,
@@ -241,14 +250,20 @@ impl NoteRenderer {
             smooth.push((pt, pres, th));
         }
 
-        // Các đoạn thân - ÍT STEPS (1.2px spacing) để nét CRISP
+        // CÃ¡c Ä‘oáº¡n thÃ¢n - ÃT STEPS (1.2px spacing) Ä‘á»ƒ nÃ©t CRISP
         for i in 1..n - 1 {
             let p_prev = screen_pts[i - 1];
             let p_curr = screen_pts[i];
             let p_next = screen_pts[i + 1];
 
-            let start_mid = Pos2::new((p_prev.0.x + p_curr.0.x) * 0.5, (p_prev.0.y + p_curr.0.y) * 0.5);
-            let end_mid = Pos2::new((p_curr.0.x + p_next.0.x) * 0.5, (p_curr.0.y + p_next.0.y) * 0.5);
+            let start_mid = Pos2::new(
+                (p_prev.0.x + p_curr.0.x) * 0.5,
+                (p_prev.0.y + p_curr.0.y) * 0.5,
+            );
+            let end_mid = Pos2::new(
+                (p_curr.0.x + p_next.0.x) * 0.5,
+                (p_curr.0.y + p_next.0.y) * 0.5,
+            );
 
             let start_pres = (p_prev.1 + p_curr.1) * 0.5;
             let end_pres = (p_curr.1 + p_next.1) * 0.5;
@@ -257,7 +272,7 @@ impl NoteRenderer {
             let end_th = (p_curr.2 + p_next.2) * 0.5;
 
             let chord = start_mid.distance(end_mid);
-            // ÍT STEPS hơn - spacing 1.2px thay vì 0.8px
+            // ÃT STEPS hÆ¡n - spacing 1.2px thay vÃ¬ 0.8px
             let steps = ((chord / 1.2).ceil() as usize).clamp(3, 20);
 
             for s in 1..=steps {
@@ -281,10 +296,13 @@ impl NoteRenderer {
             }
         }
 
-        // Đoạn cuối
+        // Äoáº¡n cuá»‘i
         let p_last = screen_pts[n - 1];
         let p_penult = screen_pts[n - 2];
-        let last_mid = Pos2::new((p_penult.0.x + p_last.0.x) * 0.5, (p_penult.0.y + p_last.0.y) * 0.5);
+        let last_mid = Pos2::new(
+            (p_penult.0.x + p_last.0.x) * 0.5,
+            (p_penult.0.y + p_last.0.y) * 0.5,
+        );
         let dist_end = last_mid.distance(p_last.0);
         let steps_end = ((dist_end / 1.8).ceil() as usize).clamp(2, 6);
         for s in 1..=steps_end {
@@ -301,12 +319,8 @@ impl NoteRenderer {
         smooth
     }
 
-    pub fn render_strokes<F>(
-        painter: &Painter,
-        strokes: &[NoteStroke],
-        scale: f32,
-        to_screen: &F,
-    ) where
+    pub fn render_strokes<F>(painter: &Painter, strokes: &[NoteStroke], scale: f32, to_screen: &F)
+    where
         F: Fn(Pos2) -> Pos2,
     {
         // Pass 1: Highlighters always rendered underneath regular ink
@@ -386,7 +400,10 @@ impl NoteRenderer {
                 let w = (stroke.size * 3.6 * scale).max(2.0);
                 let poly_pts: Vec<Pos2> = smooth_pts.iter().map(|(p, _, _)| *p).collect();
 
-                painter.add(egui::Shape::line(poly_pts.clone(), Stroke::new(w, hl_color)));
+                painter.add(egui::Shape::line(
+                    poly_pts.clone(),
+                    Stroke::new(w, hl_color),
+                ));
                 if let Some(&first) = poly_pts.first() {
                     painter.circle_filled(first, w * 0.5, hl_color);
                 }
@@ -395,8 +412,8 @@ impl NoteRenderer {
                 }
             }
             PenType::Ballpoint | PenType::Pencil | PenType::Fountain => {
-                // Toàn bộ bút mực/bút bi/bút chì đều hiển thị dải ribbon có bề dày biến thiên theo từng vi điểm
-                // (Variable-width Ribbon Mesh), loại bỏ hoàn toàn tình trạng nét vẽ bị cứng đơ như ống sắt!
+                // ToÃ n bá»™ bÃºt má»±c/bÃºt bi/bÃºt chÃ¬ Ä‘á»u hiá»ƒn thá»‹ dáº£i ribbon cÃ³ bá» dÃ y biáº¿n thiÃªn theo tá»«ng vi Ä‘iá»ƒm
+                // (Variable-width Ribbon Mesh), loáº¡i bá» hoÃ n toÃ n tÃ¬nh tráº¡ng nÃ©t váº½ bá»‹ cá»©ng Ä‘Æ¡ nhÆ° á»‘ng sáº¯t!
                 let draw_color = if stroke.pen_type == PenType::Pencil {
                     Color32::from_rgba_unmultiplied(
                         stroke.color[0],
@@ -407,7 +424,13 @@ impl NoteRenderer {
                 } else {
                     color
                 };
-                Self::render_variable_width_ribbon(painter, &smooth_pts, stroke.size, scale, draw_color);
+                Self::render_variable_width_ribbon(
+                    painter,
+                    &smooth_pts,
+                    stroke.size,
+                    scale,
+                    draw_color,
+                );
             }
             PenType::Calligraphy => {
                 let angle = std::f32::consts::FRAC_PI_4; // 45 degree chisel
@@ -455,7 +478,7 @@ impl NoteRenderer {
     }
 
     /// === ELASTIC TAIL - NATIVE CRISP FEEL ===
-    /// Đuôi CỰC NGẮN, THẲNG, BÁM SÁT như DirectInk - ZERO LAG!
+    /// ÄuÃ´i Cá»°C NGáº®N, THáº²NG, BÃM SÃT nhÆ° DirectInk - ZERO LAG!
     pub fn render_elastic_tail<F>(
         painter: &Painter,
         stroke: &NoteStroke,
@@ -479,17 +502,20 @@ impl NoteRenderer {
         let dy = raw.y - end.y;
         let dist = (dx * dx + dy * dy).sqrt();
 
-        // Ngưỡng CỰC THẤP (0.3px) - vẽ ngay lập tức
+        // NgÆ°á»¡ng Cá»°C THáº¤P (0.3px) - váº½ ngay láº­p tá»©c
         if dist > 0.3 {
-            // Đuôi CỰC NGẮN (max 5px) - gần như thẳng tới con trỏ
+            // ÄuÃ´i Cá»°C NGáº®N (max 5px) - gáº§n nhÆ° tháº³ng tá»›i con trá»
             let max_tail = 5.0 * scale.clamp(0.8, 1.1);
             let target_raw = if dist > max_tail {
-                Pos2::new(end.x + (dx / dist) * max_tail, end.y + (dy / dist) * max_tail)
+                Pos2::new(
+                    end.x + (dx / dist) * max_tail,
+                    end.y + (dy / dist) * max_tail,
+                )
             } else {
                 raw
             };
 
-            // Control point: CỰC NHẸ (5% strength) - gần như đường thẳng
+            // Control point: Cá»°C NHáº¸ (5% strength) - gáº§n nhÆ° Ä‘Æ°á»ng tháº³ng
             let ctrl = if n >= 2 {
                 let p_penult = to_screen(Pos2::new(pts[n - 2].x, pts[n - 2].y));
                 let vx = end.x - p_penult.x;
@@ -499,7 +525,7 @@ impl NoteRenderer {
                 end
             };
 
-            // Đường nối THẲNG, ít steps (4) để crisp
+            // ÄÆ°á»ng ná»‘i THáº²NG, Ã­t steps (4) Ä‘á»ƒ crisp
             let steps = 4;
             let mut tail_pts = Vec::with_capacity(steps + 1);
             for s in 0..=steps {
@@ -524,7 +550,7 @@ impl NoteRenderer {
                 (stroke.size * scale * 0.85).max(0.8)
             };
 
-            // Nối nét CRISP
+            // Ná»‘i nÃ©t CRISP
             painter.add(egui::Shape::line(tail_pts, Stroke::new(th, color)));
         }
     }
@@ -599,11 +625,19 @@ impl NoteRenderer {
 
         // Smooth round end caps
         if let Some(&(p_start, _, th)) = smooth_pts.first() {
-            let r = if th > 0.01 { (th * scale * 0.5).max(0.6) } else { (base_size * scale * 0.4).max(0.6) };
+            let r = if th > 0.01 {
+                (th * scale * 0.5).max(0.6)
+            } else {
+                (base_size * scale * 0.4).max(0.6)
+            };
             painter.circle_filled(p_start, r, color);
         }
         if let Some(&(p_end, _, th)) = smooth_pts.last() {
-            let r = if th > 0.01 { (th * scale * 0.5).max(0.6) } else { (base_size * scale * 0.4).max(0.6) };
+            let r = if th > 0.01 {
+                (th * scale * 0.5).max(0.6)
+            } else {
+                (base_size * scale * 0.4).max(0.6)
+            };
             painter.circle_filled(p_end, r, color);
         }
     }
@@ -656,7 +690,10 @@ impl NoteRenderer {
                 let mut poly = Vec::with_capacity(segments);
                 for k in 0..segments {
                     let theta = k as f32 * std::f32::consts::TAU / segments as f32;
-                    poly.push(Pos2::new(center.x + theta.cos() * rx, center.y + theta.sin() * ry));
+                    poly.push(Pos2::new(
+                        center.x + theta.cos() * rx,
+                        center.y + theta.sin() * ry,
+                    ));
                 }
 
                 if is_filled {
@@ -742,9 +779,13 @@ impl NoteRenderer {
 
                 let mut poly = Vec::with_capacity(11);
                 for i in 0..10 {
-                    let angle = -std::f32::consts::FRAC_PI_2 + (i as f32) * (std::f32::consts::TAU / 10.0);
+                    let angle =
+                        -std::f32::consts::FRAC_PI_2 + (i as f32) * (std::f32::consts::TAU / 10.0);
                     let r = if i % 2 == 0 { 1.0 } else { 0.4 };
-                    poly.push(Pos2::new(cx + angle.cos() * rx * r, cy + angle.sin() * ry * r));
+                    poly.push(Pos2::new(
+                        cx + angle.cos() * rx * r,
+                        cy + angle.sin() * ry * r,
+                    ));
                 }
                 poly.push(poly[0]);
 
@@ -770,6 +811,175 @@ impl NoteRenderer {
                     painter.add(egui::Shape::line(poly, stroke_spec));
                 }
             }
+            ShapeType::GraphQuadrant1 => {
+                let origin = Pos2::new(rect.left(), rect.bottom());
+                let y_top = Pos2::new(rect.left(), rect.top());
+                let x_right = Pos2::new(rect.right(), rect.bottom());
+                painter.line_segment([origin, y_top], stroke_spec);
+                painter.line_segment([origin, x_right], stroke_spec);
+            }
+            ShapeType::Graph2D => {
+                let c = rect.center();
+                let x_left = Pos2::new(rect.left(), c.y);
+                let x_right = Pos2::new(rect.right(), c.y);
+                let y_bottom = Pos2::new(c.x, rect.bottom());
+                let y_top = Pos2::new(c.x, rect.top());
+                painter.line_segment([x_left, x_right], stroke_spec);
+                painter.line_segment([y_bottom, y_top], stroke_spec);
+            }
+            ShapeType::Graph3D => {
+                let c = rect.center();
+                let x_left = Pos2::new(rect.left(), c.y);
+                let x_right = Pos2::new(rect.right(), c.y);
+                let y_bottom = Pos2::new(c.x, rect.bottom());
+                let y_top = Pos2::new(c.x, rect.top());
+                painter.line_segment([x_left, x_right], stroke_spec);
+                painter.line_segment([y_bottom, y_top], stroke_spec);
+
+                // Diagonal Z axis: solid from bottom-left to center, dashed from center to top-right!
+                let diag_start = Pos2::new(rect.left(), rect.bottom());
+                let diag_end = Pos2::new(rect.right(), rect.top());
+                painter.line_segment([diag_start, c], stroke_spec);
+
+                let dir = diag_end - c;
+                let total_len = dir.length();
+                if total_len > 1.0 {
+                    let unit = dir / total_len;
+                    let dash_len = (7.0 * scale).max(3.0);
+                    let gap_len = (5.0 * scale).max(2.0);
+                    let mut dist = 0.0;
+                    while dist < total_len {
+                        let seg_start = c + unit * dist;
+                        let seg_end = c + unit * (dist + dash_len).min(total_len);
+                        painter.line_segment([seg_start, seg_end], stroke_spec);
+                        dist += dash_len + gap_len;
+                    }
+                }
+            }
+            ShapeType::Cube3D => {
+                let w = rect.width();
+                let h = rect.height();
+                let dx = w * 0.28;
+                let dy = h * 0.28;
+                let f_tl = Pos2::new(rect.left(), rect.top() + dy);
+                let f_tr = Pos2::new(rect.right() - dx, rect.top() + dy);
+                let f_br = Pos2::new(rect.right() - dx, rect.bottom());
+                let f_bl = Pos2::new(rect.left(), rect.bottom());
+
+                let b_tl = Pos2::new(rect.left() + dx, rect.top());
+                let b_tr = Pos2::new(rect.right(), rect.top());
+                let b_br = Pos2::new(rect.right(), rect.bottom() - dy);
+                let b_bl = Pos2::new(rect.left() + dx, rect.bottom() - dy);
+
+                if is_filled {
+                    painter.rect_filled(Rect::from_min_max(f_tl, f_br), 0.0, color);
+                }
+
+                painter.line_segment([f_tl, f_tr], stroke_spec);
+                painter.line_segment([f_tr, f_br], stroke_spec);
+                painter.line_segment([f_br, f_bl], stroke_spec);
+                painter.line_segment([f_bl, f_tl], stroke_spec);
+
+                painter.line_segment([b_tl, b_tr], stroke_spec);
+                painter.line_segment([b_tr, b_br], stroke_spec);
+                painter.line_segment([f_tl, b_tl], stroke_spec);
+                painter.line_segment([f_tr, b_tr], stroke_spec);
+                painter.line_segment([f_br, b_br], stroke_spec);
+
+                Self::draw_dashed_segment(painter, b_bl, b_tl, stroke_spec, scale);
+                Self::draw_dashed_segment(painter, b_bl, b_br, stroke_spec, scale);
+                Self::draw_dashed_segment(painter, b_bl, f_bl, stroke_spec, scale);
+            }
+            ShapeType::Pyramid3D => {
+                let w = rect.width();
+                let h = rect.height();
+                let apex = Pos2::new(rect.left() + w * 0.5, rect.top());
+                let a = Pos2::new(rect.left(), rect.bottom());
+                let b = Pos2::new(rect.left() + w * 0.65, rect.bottom());
+                let c = Pos2::new(rect.right(), rect.bottom() - h * 0.28);
+                let d = Pos2::new(rect.left() + w * 0.35, rect.bottom() - h * 0.28);
+
+                if is_filled {
+                    let mut mesh = egui::Mesh::default();
+                    mesh.colored_vertex(a, color);
+                    mesh.colored_vertex(b, color);
+                    mesh.colored_vertex(apex, color);
+                    mesh.add_triangle(0, 1, 2);
+                    painter.add(egui::Shape::Mesh(mesh));
+                }
+
+                painter.line_segment([apex, a], stroke_spec);
+                painter.line_segment([apex, b], stroke_spec);
+                painter.line_segment([apex, c], stroke_spec);
+                painter.line_segment([a, b], stroke_spec);
+                painter.line_segment([b, c], stroke_spec);
+
+                Self::draw_dashed_segment(painter, a, d, stroke_spec, scale);
+                Self::draw_dashed_segment(painter, d, c, stroke_spec, scale);
+                Self::draw_dashed_segment(painter, apex, d, stroke_spec, scale);
+            }
+            ShapeType::Sphere3D => {
+                let c = rect.center();
+                let r = (rect.width().min(rect.height())) * 0.5;
+                if r > 1.0 {
+                    if is_filled {
+                        painter.circle_filled(c, r, color);
+                    }
+                    painter.circle_stroke(c, r, stroke_spec);
+
+                    let rx = r;
+                    let ry = r * 0.32;
+                    let steps = 36;
+                    let mut front_pts = Vec::with_capacity(steps / 2 + 1);
+                    for i in 0..=(steps / 2) {
+                        let theta = std::f32::consts::PI * (i as f32) / (steps as f32 * 0.5);
+                        front_pts.push(Pos2::new(c.x + rx * theta.cos(), c.y + ry * theta.sin()));
+                    }
+                    for w in front_pts.windows(2) {
+                        painter.line_segment([w[0], w[1]], stroke_spec);
+                    }
+
+                    let mut back_pts = Vec::with_capacity(steps / 2 + 1);
+                    for i in (steps / 2)..=steps {
+                        let theta = std::f32::consts::PI * (i as f32) / (steps as f32 * 0.5);
+                        back_pts.push(Pos2::new(c.x + rx * theta.cos(), c.y + ry * theta.sin()));
+                    }
+                    for (idx, w) in back_pts.windows(2).enumerate() {
+                        if idx % 2 == 0 {
+                            painter.line_segment([w[0], w[1]], stroke_spec);
+                        }
+                    }
+
+                    let mrx = r * 0.28;
+                    let mry = r;
+                    let mut meridian_front = Vec::new();
+                    for i in -9..=9 {
+                        let theta = std::f32::consts::FRAC_PI_2 * (i as f32 / 9.0);
+                        meridian_front.push(Pos2::new(c.x + mrx * theta.cos(), c.y + mry * theta.sin()));
+                    }
+                    for w in meridian_front.windows(2) {
+                        painter.line_segment([w[0], w[1]], stroke_spec);
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw_dashed_segment(painter: &Painter, p1: Pos2, p2: Pos2, stroke: Stroke, scale: f32) {
+        let dir = p2 - p1;
+        let total_len = dir.length();
+        if total_len <= 1.0 {
+            return;
+        }
+        let unit = dir / total_len;
+        let dash_len = (6.0 * scale).max(3.0);
+        let gap_len = (4.0 * scale).max(2.0);
+        let mut dist = 0.0;
+        while dist < total_len {
+            let seg_start = p1 + unit * dist;
+            let seg_end = p1 + unit * (dist + dash_len).min(total_len);
+            painter.line_segment([seg_start, seg_end], stroke);
+            dist += dash_len + gap_len;
         }
     }
 
@@ -788,7 +998,8 @@ impl NoteRenderer {
 
         let mut poly = Vec::with_capacity(sides + 1);
         for k in 0..sides {
-            let angle = -std::f32::consts::FRAC_PI_2 + (k as f32) * (std::f32::consts::TAU / sides as f32);
+            let angle =
+                -std::f32::consts::FRAC_PI_2 + (k as f32) * (std::f32::consts::TAU / sides as f32);
             poly.push(Pos2::new(cx + angle.cos() * rx, cy + angle.sin() * ry));
         }
         poly.push(poly[0]);

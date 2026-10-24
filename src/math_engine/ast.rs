@@ -74,10 +74,7 @@ pub enum StmtKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AssignTarget {
     Var(String),
-    Index {
-        var: String,
-        args: Vec<Expr>,
-    },
+    Index { var: String, args: Vec<Expr> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -99,6 +96,7 @@ pub enum CommandStmt {
     Grid(bool),
     Clear(Vec<String>),
     Clc,
+    Clf,
     Close(Option<String>),
     Figure,
     Who,

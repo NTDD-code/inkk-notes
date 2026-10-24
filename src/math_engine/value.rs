@@ -1,6 +1,6 @@
 //! MathValue: Matrices (column-major), Strings, Linear Algebra & Formatting
-use serde::{Deserialize, Serialize};
 use crate::math_engine::error::MathError;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MathValue {
@@ -72,7 +72,9 @@ impl MathValue {
         let cols = raw[0].len();
         for r in &raw {
             if r.len() != cols {
-                return Err(MathError::Other("Inconsistent row lengths in matrix".into()));
+                return Err(MathError::Other(
+                    "Inconsistent row lengths in matrix".into(),
+                ));
             }
         }
         let mut data = vec![0.0; rows * cols];
@@ -231,7 +233,18 @@ impl MathValue {
 
     pub fn concat_horizontal(left: &Self, right: &Self) -> Result<Self, MathError> {
         match (left, right) {
-            (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+            (
+                MathValue::Matrix {
+                    rows: r1,
+                    cols: c1,
+                    data: d1,
+                },
+                MathValue::Matrix {
+                    rows: r2,
+                    cols: c2,
+                    data: d2,
+                },
+            ) => {
                 if *r1 == 0 && *c1 == 0 {
                     return Ok(right.clone());
                 }
@@ -255,16 +268,27 @@ impl MathValue {
                     data: new_data,
                 })
             }
-            (MathValue::Str(s1), MathValue::Str(s2)) => {
-                Ok(MathValue::Str(format!("{}{}", s1, s2)))
-            }
-            _ => Err(MathError::Other("Cannot mix types or concatenate function handles".into())),
+            (MathValue::Str(s1), MathValue::Str(s2)) => Ok(MathValue::Str(format!("{}{}", s1, s2))),
+            _ => Err(MathError::Other(
+                "Cannot mix types or concatenate function handles".into(),
+            )),
         }
     }
 
     pub fn concat_vertical(top: &Self, bottom: &Self) -> Result<Self, MathError> {
         match (top, bottom) {
-            (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+            (
+                MathValue::Matrix {
+                    rows: r1,
+                    cols: c1,
+                    data: d1,
+                },
+                MathValue::Matrix {
+                    rows: r2,
+                    cols: c2,
+                    data: d2,
+                },
+            ) => {
                 if *r1 == 0 && *c1 == 0 {
                     return Ok(bottom.clone());
                 }
@@ -295,7 +319,9 @@ impl MathValue {
                     data: new_data,
                 })
             }
-            _ => Err(MathError::Other("Cannot vertically concatenate non-matrix types".into())),
+            _ => Err(MathError::Other(
+                "Cannot vertically concatenate non-matrix types".into(),
+            )),
         }
     }
 
@@ -402,7 +428,8 @@ impl MathValue {
                     let mut new_data = vec![0.0; new_rows * new_cols];
                     for col_idx in 0..*cols {
                         for row_idx in 0..*rows {
-                            new_data[col_idx * new_rows + row_idx] = data[col_idx * *rows + row_idx];
+                            new_data[col_idx * new_rows + row_idx] =
+                                data[col_idx * *rows + row_idx];
                         }
                     }
                     *rows = new_rows;
@@ -564,7 +591,11 @@ impl MathValue {
                 data[c * n + r] = aug[r][n + c];
             }
         }
-        Ok(MathValue::Matrix { rows: n, cols: n, data })
+        Ok(MathValue::Matrix {
+            rows: n,
+            cols: n,
+            data,
+        })
     }
 
     pub fn solve_linear(&self, b: &Self) -> Result<Self, MathError> {
@@ -633,7 +664,11 @@ impl MathValue {
                 data[c * n + r] = aug[r][n + c];
             }
         }
-        Ok(MathValue::Matrix { rows: n, cols: m, data })
+        Ok(MathValue::Matrix {
+            rows: n,
+            cols: m,
+            data,
+        })
     }
 
     pub fn trace(&self) -> Result<f64, MathError> {
@@ -720,7 +755,10 @@ impl MathValue {
 
                 // Check if any element requires decimal/scientific formatting
                 let has_non_int = data.iter().any(|&x| {
-                    !x.is_finite() || x.fract() != 0.0 || x.abs() >= 1e5 || (x != 0.0 && x.abs() < 1e-4)
+                    !x.is_finite()
+                        || x.fract() != 0.0
+                        || x.abs() >= 1e5
+                        || (x != 0.0 && x.abs() < 1e-4)
                 });
 
                 let mut formatted = vec![vec![String::new(); *cols]; *rows];
@@ -943,7 +981,18 @@ pub fn format_matrix_float(val: f64) -> String {
 
 pub fn op_add(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
                 return Ok(MathValue::Matrix {
@@ -980,7 +1029,18 @@ pub fn op_add(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
 
 pub fn op_sub(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
                 return Ok(MathValue::Matrix {
@@ -1011,13 +1071,26 @@ pub fn op_sub(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
                 data: d1.iter().zip(d2.iter()).map(|(&x, &y)| x - y).collect(),
             })
         }
-        _ => Err(MathError::Other("Invalid operands for subtraction '-'".into())),
+        _ => Err(MathError::Other(
+            "Invalid operands for subtraction '-'".into(),
+        )),
     }
 }
 
 pub fn op_dot_mul(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
                 return Ok(MathValue::Matrix {
@@ -1048,13 +1121,26 @@ pub fn op_dot_mul(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> 
                 data: d1.iter().zip(d2.iter()).map(|(&x, &y)| x * y).collect(),
             })
         }
-        _ => Err(MathError::Other("Invalid operands for element-wise multiplication '.*'".into())),
+        _ => Err(MathError::Other(
+            "Invalid operands for element-wise multiplication '.*'".into(),
+        )),
     }
 }
 
 pub fn op_mul(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             // If either is scalar, standard scalar multiplication
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
@@ -1099,13 +1185,26 @@ pub fn op_mul(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
                 data: new_data,
             })
         }
-        _ => Err(MathError::Other("Invalid operands for matrix multiplication '*'".into())),
+        _ => Err(MathError::Other(
+            "Invalid operands for matrix multiplication '*'".into(),
+        )),
     }
 }
 
 pub fn op_dot_div(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
                 return Ok(MathValue::Matrix {
@@ -1136,14 +1235,23 @@ pub fn op_dot_div(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> 
                 data: d1.iter().zip(d2.iter()).map(|(&x, &y)| x / y).collect(),
             })
         }
-        _ => Err(MathError::Other("Invalid operands for element-wise division './'".into())),
+        _ => Err(MathError::Other(
+            "Invalid operands for element-wise division './'".into(),
+        )),
     }
 }
 
 pub fn op_div(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     // In MATLAB: A / s when s is scalar
     match (a, b) {
-        (MathValue::Matrix { rows, cols, data }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix { rows, cols, data },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r2 == 1 && *c2 == 1 {
                 let s = d2[0];
                 return Ok(MathValue::Matrix {
@@ -1164,7 +1272,18 @@ pub fn op_div(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
 
 pub fn op_dot_pow(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             let compute = |base: f64, exp: f64| -> Result<f64, MathError> {
                 if base < 0.0 && exp.fract() != 0.0 {
                     return Err(MathError::ComplexNotSupported);
@@ -1214,13 +1333,26 @@ pub fn op_dot_pow(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> 
                 data: res,
             })
         }
-        _ => Err(MathError::Other("Invalid operands for element-wise power '.^'".into())),
+        _ => Err(MathError::Other(
+            "Invalid operands for element-wise power '.^'".into(),
+        )),
     }
 }
 
 pub fn op_pow(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: 1, cols: 1, data: d1 }, MathValue::Matrix { rows: 1, cols: 1, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: 1,
+                cols: 1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: 1,
+                cols: 1,
+                data: d2,
+            },
+        ) => {
             let base = d1[0];
             let exp = d2[0];
             if base < 0.0 && exp.fract() != 0.0 {
@@ -1228,13 +1360,22 @@ pub fn op_pow(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
             }
             Ok(MathValue::scalar(base.powf(exp)))
         }
-        (MathValue::Matrix { rows, cols, .. }, MathValue::Matrix { rows: 1, cols: 1, data: d2 }) => {
+        (
+            MathValue::Matrix { rows, cols, .. },
+            MathValue::Matrix {
+                rows: 1,
+                cols: 1,
+                data: d2,
+            },
+        ) => {
             if rows != cols {
                 return Err(MathError::MatrixMustBeSquare);
             }
             let exp = d2[0];
             if exp.fract() != 0.0 {
-                return Err(MathError::Other("Matrix power requires integer exponent".into()));
+                return Err(MathError::Other(
+                    "Matrix power requires integer exponent".into(),
+                ));
             }
             let n = exp as i64;
             if n == 0 {
@@ -1250,7 +1391,9 @@ pub fn op_pow(a: &MathValue, b: &MathValue) -> Result<MathValue, MathError> {
             }
             Ok(res)
         }
-        _ => Err(MathError::Other("Invalid operands for matrix power '^'".into())),
+        _ => Err(MathError::Other(
+            "Invalid operands for matrix power '^'".into(),
+        )),
     }
 }
 
@@ -1268,20 +1411,40 @@ pub fn op_neg(a: &MathValue) -> Result<MathValue, MathError> {
 pub fn op_not(a: &MathValue) -> Result<MathValue, MathError> {
     match a {
         MathValue::Matrix { rows, cols, data } => {
-            let res: Vec<f64> = data.iter().map(|&x| if x == 0.0 { 1.0 } else { 0.0 }).collect();
+            let res: Vec<f64> = data
+                .iter()
+                .map(|&x| if x == 0.0 { 1.0 } else { 0.0 })
+                .collect();
             Ok(MathValue::Matrix {
                 rows: *rows,
                 cols: *cols,
                 data: res,
             })
         }
-        _ => Err(MathError::Other("Cannot apply '~' to non-numeric value".into())),
+        _ => Err(MathError::Other(
+            "Cannot apply '~' to non-numeric value".into(),
+        )),
     }
 }
 
-pub fn op_relational(a: &MathValue, b: &MathValue, cmp: fn(f64, f64) -> f64) -> Result<MathValue, MathError> {
+pub fn op_relational(
+    a: &MathValue,
+    b: &MathValue,
+    cmp: fn(f64, f64) -> f64,
+) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
                 return Ok(MathValue::Matrix {
@@ -1312,6 +1475,8 @@ pub fn op_relational(a: &MathValue, b: &MathValue, cmp: fn(f64, f64) -> f64) -> 
                 data: d1.iter().zip(d2.iter()).map(|(&x, &y)| cmp(x, y)).collect(),
             })
         }
-        _ => Err(MathError::Other("Comparison operands must be numeric".into())),
+        _ => Err(MathError::Other(
+            "Comparison operands must be numeric".into(),
+        )),
     }
 }

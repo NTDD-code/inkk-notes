@@ -1,5 +1,4 @@
 //! Evaluator with Call Stack, Scopes, Limits, and Plot Dispatching for Inkk MathEngine
-use std::collections::HashMap;
 use crate::math_engine::ast::*;
 use crate::math_engine::error::MathError;
 use crate::math_engine::parser::Parser;
@@ -9,6 +8,7 @@ use crate::math_engine::value::{
     op_add, op_div, op_dot_div, op_dot_mul, op_dot_pow, op_mul, op_neg, op_not, op_pow,
     op_relational, op_sub, MathValue,
 };
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct ExecutionLimits {
@@ -55,11 +55,21 @@ impl StackFrame {
             local_functions,
             is_isolated: true,
         };
-        frame.variables.insert("pi".to_string(), MathValue::scalar(std::f64::consts::PI));
-        frame.variables.insert("e".to_string(), MathValue::scalar(std::f64::consts::E));
-        frame.variables.insert("Inf".to_string(), MathValue::scalar(f64::INFINITY));
-        frame.variables.insert("NaN".to_string(), MathValue::scalar(f64::NAN));
-        frame.variables.insert("eps".to_string(), MathValue::scalar(f64::EPSILON));
+        frame
+            .variables
+            .insert("pi".to_string(), MathValue::scalar(std::f64::consts::PI));
+        frame
+            .variables
+            .insert("e".to_string(), MathValue::scalar(std::f64::consts::E));
+        frame
+            .variables
+            .insert("Inf".to_string(), MathValue::scalar(f64::INFINITY));
+        frame
+            .variables
+            .insert("NaN".to_string(), MathValue::scalar(f64::NAN));
+        frame
+            .variables
+            .insert("eps".to_string(), MathValue::scalar(f64::EPSILON));
         frame
     }
 }
@@ -173,11 +183,21 @@ impl Default for Evaluator {
     fn default() -> Self {
         let mut root_frame = StackFrame::new("base");
         // Pre-populate standard constants
-        root_frame.variables.insert("pi".to_string(), MathValue::scalar(std::f64::consts::PI));
-        root_frame.variables.insert("e".to_string(), MathValue::scalar(std::f64::consts::E));
-        root_frame.variables.insert("Inf".to_string(), MathValue::scalar(f64::INFINITY));
-        root_frame.variables.insert("NaN".to_string(), MathValue::scalar(f64::NAN));
-        root_frame.variables.insert("eps".to_string(), MathValue::scalar(f64::EPSILON));
+        root_frame
+            .variables
+            .insert("pi".to_string(), MathValue::scalar(std::f64::consts::PI));
+        root_frame
+            .variables
+            .insert("e".to_string(), MathValue::scalar(std::f64::consts::E));
+        root_frame
+            .variables
+            .insert("Inf".to_string(), MathValue::scalar(f64::INFINITY));
+        root_frame
+            .variables
+            .insert("NaN".to_string(), MathValue::scalar(f64::NAN));
+        root_frame
+            .variables
+            .insert("eps".to_string(), MathValue::scalar(f64::EPSILON));
 
         Self {
             frames: vec![root_frame],
@@ -251,11 +271,21 @@ impl Evaluator {
     pub fn clear_all_vars(&mut self) {
         if let Some(frame) = self.frames.last_mut() {
             frame.variables.clear();
-            frame.variables.insert("pi".to_string(), MathValue::scalar(std::f64::consts::PI));
-            frame.variables.insert("e".to_string(), MathValue::scalar(std::f64::consts::E));
-            frame.variables.insert("Inf".to_string(), MathValue::scalar(f64::INFINITY));
-            frame.variables.insert("NaN".to_string(), MathValue::scalar(f64::NAN));
-            frame.variables.insert("eps".to_string(), MathValue::scalar(f64::EPSILON));
+            frame
+                .variables
+                .insert("pi".to_string(), MathValue::scalar(std::f64::consts::PI));
+            frame
+                .variables
+                .insert("e".to_string(), MathValue::scalar(std::f64::consts::E));
+            frame
+                .variables
+                .insert("Inf".to_string(), MathValue::scalar(f64::INFINITY));
+            frame
+                .variables
+                .insert("NaN".to_string(), MathValue::scalar(f64::NAN));
+            frame
+                .variables
+                .insert("eps".to_string(), MathValue::scalar(f64::EPSILON));
         }
     }
 
@@ -299,8 +329,7 @@ impl Evaluator {
                 Ok(None) => break,
                 Err(e) => {
                     let err_str = e.format_with_line(0);
-                    output.error = Some(err_str.clone());
-                    output_lines.push(err_str);
+                    output.error = Some(err_str);
                     break;
                 }
             }
@@ -335,7 +364,11 @@ impl Evaluator {
                 self.eval_command(cmd, output_lines, canvas_cmds)?;
                 Ok(StmtControl::Normal)
             }
-            StmtKind::Assign { target, expr, print } => {
+            StmtKind::Assign {
+                target,
+                expr,
+                print,
+            } => {
                 let val = self.eval_expr(expr, None, output_lines, canvas_cmds)?;
 
                 // Check matrix element count limit
@@ -352,8 +385,15 @@ impl Evaluator {
                         }
                     }
                     AssignTarget::Index { var, args } => {
-                        let mut target_val = self.lookup_var(var).cloned().unwrap_or(MathValue::empty());
-                        self.assign_indexed(&mut target_val, args, &val, output_lines, canvas_cmds)?;
+                        let mut target_val =
+                            self.lookup_var(var).cloned().unwrap_or(MathValue::empty());
+                        self.assign_indexed(
+                            &mut target_val,
+                            args,
+                            &val,
+                            output_lines,
+                            canvas_cmds,
+                        )?;
                         let display = format_assign_output(var, &target_val, self.format_mode);
                         self.set_var(var, target_val);
                         if *print {
@@ -363,19 +403,26 @@ impl Evaluator {
                 }
                 Ok(StmtControl::Normal)
             }
-            StmtKind::MultiAssign { targets, expr, print } => {
+            StmtKind::MultiAssign {
+                targets,
+                expr,
+                print,
+            } => {
                 let num_targets = targets.len();
-                let unpacked: Vec<MathValue> = if let ExprKind::CallOrIndex { name, args } = &expr.kind {
-                    self.eval_call_multi(name, args, num_targets, output_lines, canvas_cmds)?
-                } else {
-                    let val = self.eval_expr(expr, None, output_lines, canvas_cmds)?;
-                    match &val {
-                        MathValue::Matrix { data, .. } if data.len() >= num_targets => {
-                            data.iter().take(num_targets).map(|&x| MathValue::scalar(x)).collect()
+                let unpacked: Vec<MathValue> =
+                    if let ExprKind::CallOrIndex { name, args } = &expr.kind {
+                        self.eval_call_multi(name, args, num_targets, output_lines, canvas_cmds)?
+                    } else {
+                        let val = self.eval_expr(expr, None, output_lines, canvas_cmds)?;
+                        match &val {
+                            MathValue::Matrix { data, .. } if data.len() >= num_targets => data
+                                .iter()
+                                .take(num_targets)
+                                .map(|&x| MathValue::scalar(x))
+                                .collect(),
+                            _ => vec![val; num_targets],
                         }
-                        _ => vec![val; num_targets],
-                    }
-                };
+                    };
                 for (name, item) in targets.iter().zip(unpacked.into_iter()) {
                     let display = format_assign_output(name, &item, self.format_mode);
                     self.set_var(name, item);
@@ -387,10 +434,20 @@ impl Evaluator {
             }
             StmtKind::Expr { expr, print } => {
                 let val = self.eval_expr(expr, None, output_lines, canvas_cmds)?;
-                self.set_var("ans", val.clone());
-                if *print {
-                    let display = format_assign_output("ans", &val, self.format_mode);
-                    output_lines.push(display);
+                let is_zero_output = match &expr.kind {
+                    ExprKind::CallOrIndex { name, .. } | ExprKind::Ident(name) => self
+                        .registry
+                        .get(name)
+                        .map(|entry| entry.metadata.num_outputs == 0)
+                        .unwrap_or(false),
+                    _ => false,
+                };
+                if !is_zero_output {
+                    self.set_var("ans", val.clone());
+                    if *print {
+                        let display = format_assign_output("ans", &val, self.format_mode);
+                        output_lines.push(display);
+                    }
                 }
                 Ok(StmtControl::Normal)
             }
@@ -407,14 +464,19 @@ impl Evaluator {
                                 for r in 0..*rows {
                                     col_data.push(data[c * *rows + r]);
                                 }
-                                col_mats.push(MathValue::Matrix { rows: *rows, cols: 1, data: col_data });
+                                col_mats.push(MathValue::Matrix {
+                                    rows: *rows,
+                                    cols: 1,
+                                    data: col_data,
+                                });
                             }
                             col_mats
                         }
                     }
-                    MathValue::Str(s) => {
-                        s.chars().map(|c| MathValue::string(c.to_string())).collect()
-                    }
+                    MathValue::Str(s) => s
+                        .chars()
+                        .map(|c| MathValue::string(c.to_string()))
+                        .collect(),
                     _ => vec![val],
                 };
 
@@ -467,7 +529,10 @@ impl Evaluator {
                 }
                 Ok(StmtControl::Normal)
             }
-            StmtKind::If { branches, else_branch } => {
+            StmtKind::If {
+                branches,
+                else_branch,
+            } => {
                 let mut executed = false;
                 for (cond_expr, branch_body) in branches {
                     let c_val = self.eval_expr(cond_expr, None, output_lines, canvas_cmds)?;
@@ -530,6 +595,10 @@ impl Evaluator {
             CommandStmt::Clc => {
                 output_lines.clear();
             }
+            CommandStmt::Clf => {
+                self.current_figure_curves.clear();
+                canvas_cmds.push(CanvasCommand::ClearPlots);
+            }
             CommandStmt::Close(_target) => {
                 self.current_figure_curves.clear();
                 canvas_cmds.push(CanvasCommand::ClearPlots);
@@ -554,7 +623,10 @@ impl Evaluator {
                             let size = val.size_string();
                             let bytes = val.numel() * 8;
                             let class = val.type_name();
-                            out.push_str(&format!("  {:8}  {:14}  {:5}  {}\n", name, size, bytes, class));
+                            out.push_str(&format!(
+                                "  {:8}  {:14}  {:5}  {}\n",
+                                name, size, bytes, class
+                            ));
                         }
                     }
                     output_lines.push(out.trim_end().to_string());
@@ -563,26 +635,34 @@ impl Evaluator {
             CommandStmt::Format(mode) => {
                 self.format_mode = *mode;
             }
-            CommandStmt::Axis(opt) => {
-                match opt {
-                    AxisOption::Equal => canvas_cmds.push(CanvasCommand::SetAxisEqual),
-                    AxisOption::Limits(lims) => canvas_cmds.push(CanvasCommand::SetAxisLimits(lims.clone())),
+            CommandStmt::Axis(opt) => match opt {
+                AxisOption::Equal => canvas_cmds.push(CanvasCommand::SetAxisEqual),
+                AxisOption::Limits(lims) => {
+                    canvas_cmds.push(CanvasCommand::SetAxisLimits(lims.clone()))
                 }
-            }
+            },
             CommandStmt::Help(opt) => {
                 if let Some(name) = opt {
                     if let Some(meta) = self.registry.describe_function(name) {
                         if meta.examples.is_empty() {
                             output_lines.push(meta.help.clone());
                         } else {
-                            let out = format!("--- HELP: {} ---\n{}\n\nExamples:\n{}", meta.name, meta.help, meta.examples.join("\n"));
+                            let out = format!(
+                                "--- HELP: {} ---\n{}\n\nExamples:\n{}",
+                                meta.name,
+                                meta.help,
+                                meta.examples.join("\n")
+                            );
                             output_lines.push(out);
                         }
                     } else {
                         output_lines.push(format!("No help found for '{}'.", name));
                     }
                 } else {
-                    output_lines.push("MathStudio: Type 'help <function>' to view help for a function.".to_string());
+                    output_lines.push(
+                        "MathStudio: Type 'help <function>' to view help for a function."
+                            .to_string(),
+                    );
                 }
             }
             CommandStmt::Which(name) => {
@@ -593,9 +673,13 @@ impl Evaluator {
                         }
                         FunctionKind::User(ast, _) => {
                             if let Some(lib) = &ast.library {
-                                output_lines.push(format!("'{}' is a function in library '{}'.", name, lib));
+                                output_lines.push(format!(
+                                    "'{}' is a function in library '{}'.",
+                                    name, lib
+                                ));
                             } else {
-                                output_lines.push(format!("'{}' is a user-defined function.", name));
+                                output_lines
+                                    .push(format!("'{}' is a user-defined function.", name));
                             }
                         }
                     }
@@ -622,7 +706,9 @@ impl Evaluator {
             ExprKind::Number(n) => Ok(MathValue::scalar(*n)),
             ExprKind::Str(s) => Ok(MathValue::string(s)),
             ExprKind::End => {
-                let val = end_val.ok_or(MathError::Other("end only allowed in indexing context".into()))?;
+                let val = end_val.ok_or(MathError::Other(
+                    "end only allowed in indexing context".into(),
+                ))?;
                 Ok(MathValue::scalar(val as f64))
             }
             ExprKind::ColonAll => {
@@ -631,18 +717,45 @@ impl Evaluator {
             ExprKind::Ident(name) => {
                 if let Some(val) = self.lookup_var(name) {
                     Ok(val.clone())
+                } else if self.registry.get(name).is_some()
+                    || self
+                        .frames
+                        .last()
+                        .map(|f| f.local_functions.contains_key(name))
+                        .unwrap_or(false)
+                {
+                    self.eval_expr(
+                        &Expr {
+                            line: expr.line,
+                            kind: ExprKind::CallOrIndex {
+                                name: name.clone(),
+                                args: Vec::new(),
+                            },
+                        },
+                        end_val,
+                        output_lines,
+                        canvas_cmds,
+                    )
                 } else {
                     Err(MathError::UnrecognizedIdent(name.clone()))
                 }
             }
             ExprKind::Range { start, step, end } => {
-                let a = self.eval_expr(start, end_val, output_lines, canvas_cmds)?.as_scalar().ok_or(MathError::Other("Range start must be scalar".into()))?;
+                let a = self
+                    .eval_expr(start, end_val, output_lines, canvas_cmds)?
+                    .as_scalar()
+                    .ok_or(MathError::Other("Range start must be scalar".into()))?;
                 let st = if let Some(step_expr) = step {
-                    self.eval_expr(step_expr, end_val, output_lines, canvas_cmds)?.as_scalar().ok_or(MathError::Other("Range step must be scalar".into()))?
+                    self.eval_expr(step_expr, end_val, output_lines, canvas_cmds)?
+                        .as_scalar()
+                        .ok_or(MathError::Other("Range step must be scalar".into()))?
                 } else {
                     1.0
                 };
-                let b = self.eval_expr(end, end_val, output_lines, canvas_cmds)?.as_scalar().ok_or(MathError::Other("Range end must be scalar".into()))?;
+                let b = self
+                    .eval_expr(end, end_val, output_lines, canvas_cmds)?
+                    .as_scalar()
+                    .ok_or(MathError::Other("Range end must be scalar".into()))?;
 
                 if st == 0.0 {
                     return Err(MathError::Other("Range step cannot be 0".into()));
@@ -692,14 +805,46 @@ impl Evaluator {
                     BinaryOp::DotMul => op_dot_mul(&l_val, &r_val),
                     BinaryOp::DotDiv => op_dot_div(&l_val, &r_val),
                     BinaryOp::DotPow => op_dot_pow(&l_val, &r_val),
-                    BinaryOp::Eq => op_relational(&l_val, &r_val, |a, b| if (a - b).abs() < 1e-9 { 1.0 } else { 0.0 }),
-                    BinaryOp::Ne => op_relational(&l_val, &r_val, |a, b| if (a - b).abs() >= 1e-9 { 1.0 } else { 0.0 }),
-                    BinaryOp::Lt => op_relational(&l_val, &r_val, |a, b| if a < b { 1.0 } else { 0.0 }),
-                    BinaryOp::Le => op_relational(&l_val, &r_val, |a, b| if a <= b + 1e-9 { 1.0 } else { 0.0 }),
-                    BinaryOp::Gt => op_relational(&l_val, &r_val, |a, b| if a > b { 1.0 } else { 0.0 }),
-                    BinaryOp::Ge => op_relational(&l_val, &r_val, |a, b| if a >= b - 1e-9 { 1.0 } else { 0.0 }),
-                    BinaryOp::And => op_relational(&l_val, &r_val, |a, b| if a != 0.0 && b != 0.0 { 1.0 } else { 0.0 }),
-                    BinaryOp::Or => op_relational(&l_val, &r_val, |a, b| if a != 0.0 || b != 0.0 { 1.0 } else { 0.0 }),
+                    BinaryOp::Eq => {
+                        op_relational(
+                            &l_val,
+                            &r_val,
+                            |a, b| if (a - b).abs() < 1e-9 { 1.0 } else { 0.0 },
+                        )
+                    }
+                    BinaryOp::Ne => op_relational(&l_val, &r_val, |a, b| {
+                        if (a - b).abs() >= 1e-9 {
+                            1.0
+                        } else {
+                            0.0
+                        }
+                    }),
+                    BinaryOp::Lt => {
+                        op_relational(&l_val, &r_val, |a, b| if a < b { 1.0 } else { 0.0 })
+                    }
+                    BinaryOp::Le => {
+                        op_relational(&l_val, &r_val, |a, b| if a <= b + 1e-9 { 1.0 } else { 0.0 })
+                    }
+                    BinaryOp::Gt => {
+                        op_relational(&l_val, &r_val, |a, b| if a > b { 1.0 } else { 0.0 })
+                    }
+                    BinaryOp::Ge => {
+                        op_relational(&l_val, &r_val, |a, b| if a >= b - 1e-9 { 1.0 } else { 0.0 })
+                    }
+                    BinaryOp::And => {
+                        op_relational(
+                            &l_val,
+                            &r_val,
+                            |a, b| if a != 0.0 && b != 0.0 { 1.0 } else { 0.0 },
+                        )
+                    }
+                    BinaryOp::Or => {
+                        op_relational(
+                            &l_val,
+                            &r_val,
+                            |a, b| if a != 0.0 || b != 0.0 { 1.0 } else { 0.0 },
+                        )
+                    }
                 }
             }
             ExprKind::Matrix(rows) => {
@@ -731,22 +876,28 @@ impl Evaluator {
 
                 Ok(result)
             }
-            ExprKind::AnonymousFn { params, body } => {
-                Ok(MathValue::AnonymousFn {
-                    params: params.clone(),
-                    body: body.clone(),
-                })
-            }
+            ExprKind::AnonymousFn { params, body } => Ok(MathValue::AnonymousFn {
+                params: params.clone(),
+                body: body.clone(),
+            }),
             ExprKind::CallOrIndex { name, args } => {
                 // 1. Check local functions in current frame
                 let local_fn_opt = self.frames.last().and_then(|frame| {
-                    frame.local_functions.get(name).map(|ast| (ast.clone(), frame.local_functions.clone()))
+                    frame
+                        .local_functions
+                        .get(name)
+                        .map(|ast| (ast.clone(), frame.local_functions.clone()))
                 });
 
                 if let Some((mut ast, parent_locals)) = local_fn_opt {
                     let mut evaluated_args = Vec::with_capacity(args.len());
                     for a in args {
-                        evaluated_args.push(self.eval_expr(a, end_val, output_lines, canvas_cmds)?);
+                        evaluated_args.push(self.eval_expr(
+                            a,
+                            end_val,
+                            output_lines,
+                            canvas_cmds,
+                        )?);
                     }
                     ast.local_functions = parent_locals;
                     let meta = FunctionMetadata {
@@ -757,7 +908,14 @@ impl Evaluator {
                         help: String::new(),
                         examples: Vec::new(),
                     };
-                    let outs = self.call_user_function(&ast, &meta, &evaluated_args, 1, output_lines, canvas_cmds)?;
+                    let outs = self.call_user_function(
+                        &ast,
+                        &meta,
+                        &evaluated_args,
+                        1,
+                        output_lines,
+                        canvas_cmds,
+                    )?;
                     return Ok(outs.into_iter().next().unwrap_or(MathValue::empty()));
                 }
 
@@ -774,7 +932,12 @@ impl Evaluator {
                             }
                             let mut evaluated_args = Vec::with_capacity(args.len());
                             for a in args {
-                                evaluated_args.push(self.eval_expr(a, end_val, output_lines, canvas_cmds)?);
+                                evaluated_args.push(self.eval_expr(
+                                    a,
+                                    end_val,
+                                    output_lines,
+                                    canvas_cmds,
+                                )?);
                             }
 
                             let mut frame = StackFrame::new(name.clone());
@@ -795,12 +958,24 @@ impl Evaluator {
                 if let Some(entry) = self.registry.get(name).cloned() {
                     let mut evaluated_args = Vec::with_capacity(args.len());
                     for a in args {
-                        evaluated_args.push(self.eval_expr(a, end_val, output_lines, canvas_cmds)?);
+                        evaluated_args.push(self.eval_expr(
+                            a,
+                            end_val,
+                            output_lines,
+                            canvas_cmds,
+                        )?);
                     }
 
                     match entry.kind {
                         FunctionKind::User(ast, meta) => {
-                            let outs = self.call_user_function(&ast, &meta, &evaluated_args, 1, output_lines, canvas_cmds)?;
+                            let outs = self.call_user_function(
+                                &ast,
+                                &meta,
+                                &evaluated_args,
+                                1,
+                                output_lines,
+                                canvas_cmds,
+                            )?;
                             return Ok(outs.into_iter().next().unwrap_or(MathValue::empty()));
                         }
                         FunctionKind::Builtin(_) => {
@@ -883,7 +1058,9 @@ impl Evaluator {
 
             if is_r_colon {
                 let c_val = self.eval_expr(c_expr, Some(cols), output_lines, canvas_cmds)?;
-                let c = c_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
+                let c = c_val
+                    .as_scalar()
+                    .ok_or(MathError::IndexMustBePositiveInteger)?;
                 if c.fract() != 0.0 || c < 1.0 {
                     return Err(MathError::IndexMustBePositiveInteger);
                 }
@@ -892,7 +1069,9 @@ impl Evaluator {
 
             if is_c_colon {
                 let r_val = self.eval_expr(r_expr, Some(rows), output_lines, canvas_cmds)?;
-                let r = r_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
+                let r = r_val
+                    .as_scalar()
+                    .ok_or(MathError::IndexMustBePositiveInteger)?;
                 if r.fract() != 0.0 || r < 1.0 {
                     return Err(MathError::IndexMustBePositiveInteger);
                 }
@@ -902,8 +1081,12 @@ impl Evaluator {
             let r_val = self.eval_expr(r_expr, Some(rows), output_lines, canvas_cmds)?;
             let c_val = self.eval_expr(c_expr, Some(cols), output_lines, canvas_cmds)?;
 
-            let r = r_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
-            let c = c_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
+            let r = r_val
+                .as_scalar()
+                .ok_or(MathError::IndexMustBePositiveInteger)?;
+            let c = c_val
+                .as_scalar()
+                .ok_or(MathError::IndexMustBePositiveInteger)?;
             if r.fract() != 0.0 || r < 1.0 || c.fract() != 0.0 || c < 1.0 {
                 return Err(MathError::IndexMustBePositiveInteger);
             }
@@ -912,7 +1095,9 @@ impl Evaluator {
             return Ok(MathValue::scalar(val));
         }
 
-        Err(MathError::Other("Indexing with more than 2 dimensions not supported".into()))
+        Err(MathError::Other(
+            "Indexing with more than 2 dimensions not supported".into(),
+        ))
     }
 
     fn assign_indexed(
@@ -923,11 +1108,16 @@ impl Evaluator {
         output_lines: &mut Vec<String>,
         canvas_cmds: &mut Vec<CanvasCommand>,
     ) -> Result<(), MathError> {
-        let rhs_scalar = rhs.as_scalar().ok_or(MathError::Other("Indexed assignment only supports scalar values currently".into()))?;
+        let rhs_scalar = rhs.as_scalar().ok_or(MathError::Other(
+            "Indexed assignment only supports scalar values currently".into(),
+        ))?;
 
         if args.len() == 1 {
-            let k_val = self.eval_expr(&args[0], Some(target.numel()), output_lines, canvas_cmds)?;
-            let k = k_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
+            let k_val =
+                self.eval_expr(&args[0], Some(target.numel()), output_lines, canvas_cmds)?;
+            let k = k_val
+                .as_scalar()
+                .ok_or(MathError::IndexMustBePositiveInteger)?;
             if k.fract() != 0.0 || k < 1.0 {
                 return Err(MathError::IndexMustBePositiveInteger);
             }
@@ -937,8 +1127,12 @@ impl Evaluator {
             let r_val = self.eval_expr(&args[0], Some(target.rows()), output_lines, canvas_cmds)?;
             let c_val = self.eval_expr(&args[1], Some(target.cols()), output_lines, canvas_cmds)?;
 
-            let r = r_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
-            let c = c_val.as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
+            let r = r_val
+                .as_scalar()
+                .ok_or(MathError::IndexMustBePositiveInteger)?;
+            let c = c_val
+                .as_scalar()
+                .ok_or(MathError::IndexMustBePositiveInteger)?;
             if r.fract() != 0.0 || r < 1.0 || c.fract() != 0.0 || c < 1.0 {
                 return Err(MathError::IndexMustBePositiveInteger);
             }
@@ -947,7 +1141,9 @@ impl Evaluator {
             return Ok(());
         }
 
-        Err(MathError::Other("Indexed assignment with > 2 dimensions not supported".into()))
+        Err(MathError::Other(
+            "Indexed assignment with > 2 dimensions not supported".into(),
+        ))
     }
 
     pub fn call_user_function(
@@ -976,8 +1172,12 @@ impl Evaluator {
         for (param, val) in ast.params.iter().zip(args.iter()) {
             frame.variables.insert(param.clone(), val.clone());
         }
-        frame.variables.insert("nargin".to_string(), MathValue::scalar(args.len() as f64));
-        frame.variables.insert("nargout".to_string(), MathValue::scalar(nargout as f64));
+        frame
+            .variables
+            .insert("nargin".to_string(), MathValue::scalar(args.len() as f64));
+        frame
+            .variables
+            .insert("nargout".to_string(), MathValue::scalar(nargout as f64));
 
         self.frames.push(frame);
 
@@ -1032,7 +1232,10 @@ impl Evaluator {
 
         // 1. Check local functions in current frame
         let local_fn_opt = self.frames.last().and_then(|frame| {
-            frame.local_functions.get(name).map(|ast| (ast.clone(), frame.local_functions.clone()))
+            frame
+                .local_functions
+                .get(name)
+                .map(|ast| (ast.clone(), frame.local_functions.clone()))
         });
 
         if let Some((mut ast, parent_locals)) = local_fn_opt {
@@ -1045,7 +1248,14 @@ impl Evaluator {
                 help: String::new(),
                 examples: Vec::new(),
             };
-            return self.call_user_function(&ast, &meta, &evaluated_args, nargout, output_lines, canvas_cmds);
+            return self.call_user_function(
+                &ast,
+                &meta,
+                &evaluated_args,
+                nargout,
+                output_lines,
+                canvas_cmds,
+            );
         }
 
         // 2. Check variable in workspace
@@ -1064,9 +1274,11 @@ impl Evaluator {
                 _ => self.eval_indexing(&var, args, output_lines, canvas_cmds)?,
             };
             let unpacked = match &single_val {
-                MathValue::Matrix { data, .. } if data.len() >= nargout => {
-                    data.iter().take(nargout).map(|&x| MathValue::scalar(x)).collect()
-                }
+                MathValue::Matrix { data, .. } if data.len() >= nargout => data
+                    .iter()
+                    .take(nargout)
+                    .map(|&x| MathValue::scalar(x))
+                    .collect(),
                 _ => vec![single_val; nargout],
             };
             return Ok(unpacked);
@@ -1075,7 +1287,10 @@ impl Evaluator {
         // 3. Special handling for size(A) in multi-assignment: [r, c] = size(A)
         if name == "size" && nargout == 2 && !evaluated_args.is_empty() {
             let (r, c) = (evaluated_args[0].rows(), evaluated_args[0].cols());
-            return Ok(vec![MathValue::scalar(r as f64), MathValue::scalar(c as f64)]);
+            return Ok(vec![
+                MathValue::scalar(r as f64),
+                MathValue::scalar(c as f64),
+            ]);
         }
 
         // 4. Check registry
@@ -1094,15 +1309,24 @@ impl Evaluator {
                     };
                     let single_val = f(&evaluated_args, &mut ctx)?;
                     let unpacked = match &single_val {
-                        MathValue::Matrix { data, .. } if data.len() >= nargout => {
-                            data.iter().take(nargout).map(|&x| MathValue::scalar(x)).collect()
-                        }
+                        MathValue::Matrix { data, .. } if data.len() >= nargout => data
+                            .iter()
+                            .take(nargout)
+                            .map(|&x| MathValue::scalar(x))
+                            .collect(),
                         _ => vec![single_val; nargout],
                     };
                     return Ok(unpacked);
                 }
                 FunctionKind::User(ast, meta) => {
-                    return self.call_user_function(&ast, &meta, &evaluated_args, nargout, output_lines, canvas_cmds);
+                    return self.call_user_function(
+                        &ast,
+                        &meta,
+                        &evaluated_args,
+                        nargout,
+                        output_lines,
+                        canvas_cmds,
+                    );
                 }
             }
         }
@@ -1111,13 +1335,21 @@ impl Evaluator {
     }
 }
 
-fn format_assign_output(name: &str, val: &MathValue, mode: crate::math_engine::ast::FormatMode) -> String {
+fn format_assign_output(
+    name: &str,
+    val: &MathValue,
+    mode: crate::math_engine::ast::FormatMode,
+) -> String {
     match val {
         MathValue::Str(s) => format!("{} = {}", name, s),
-        MathValue::Matrix { rows: 1, cols: 1, .. } => {
+        MathValue::Matrix {
+            rows: 1, cols: 1, ..
+        } => {
             format!("{} = {}", name, val.to_display_string_with_mode(mode))
         }
-        MathValue::Matrix { rows: 0, cols: 0, .. } => {
+        MathValue::Matrix {
+            rows: 0, cols: 0, ..
+        } => {
             format!("{} = [](0x0)", name)
         }
         _ => {

@@ -3,14 +3,21 @@ use std::f32::consts::PI;
 
 use crate::theme::Palette;
 
-const SNAP_THRESHOLD: f32 = 28.0;
-const CORNER_RADIUS: f32 = 14.0;
+const SNAP_THRESHOLD: f32 = 32.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RulerKind {
     None,
-    Ruler,       // Straight glassmorphic ruler
-    Protractor,  // Circular glassmorphic protractor / compass
+    Ruler,      // Straight glassmorphic ruler (full-screen length)
+    Protractor, // Circular glassmorphic protractor / compass
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveRulerEdge {
+    None,
+    RulerTop,
+    RulerBottom,
+    ProtractorCircumference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +39,9 @@ pub struct RulerState {
     pub width: f32,
     pub radius: f32,
 
+    // Active locked edge during inking stroke
+    pub active_stroke_edge: ActiveRulerEdge,
+
     // Gesture tracking
     pub is_dragging: bool,
     pub is_rotating: bool,
@@ -48,9 +58,11 @@ impl Default for RulerState {
             kind: RulerKind::None,
             center: Pos2::new(560.0, 360.0),
             angle_rad: 0.0,
-            length: 560.0,
-            width: 88.0,
+            length: 6000.0, // Full-screen spanning length
+            width: 84.0,
             radius: 160.0,
+
+            active_stroke_edge: ActiveRulerEdge::None,
 
             is_dragging: false,
             is_rotating: false,
@@ -102,54 +114,49 @@ impl RulerState {
         match self.kind {
             RulerKind::Ruler => {
                 let rel = p - self.center;
-                let dir = self.dir();
                 let normal = self.normal();
-                let u = rel.dot(dir);
                 let v = rel.dot(normal);
-
-                let half_l = self.length * 0.5;
                 let half_w = self.width * 0.5;
 
-                // Center circular dial (radius 36px)
+                // 1. Center circular dial (radius 36px)
                 if rel.length() <= 36.0 {
                     return RulerHit::Dial;
                 }
 
-                // Check distance to straight measuring edges for drawing snap hint
-                let straight_limit = half_l - CORNER_RADIUS;
-                if u >= -straight_limit - 8.0 && u <= straight_limit + 8.0 {
-                    let d_top = (v + half_w).abs();
-                    let d_bottom = (v - half_w).abs();
-                    if d_top <= SNAP_THRESHOLD {
-                        return RulerHit::EdgeTop;
-                    }
-                    if d_bottom <= SNAP_THRESHOLD {
-                        return RulerHit::EdgeBottom;
-                    }
+                // 2. Straight measuring edges:
+                // Top edge is at v = -half_w. Snap zone: 32px outside, 12px inside.
+                if v >= -half_w - SNAP_THRESHOLD && v <= -half_w + 12.0 {
+                    return RulerHit::EdgeTop;
+                }
+                // Bottom edge is at v = +half_w. Snap zone: 12px inside, 32px outside.
+                if v >= half_w - 12.0 && v <= half_w + SNAP_THRESHOLD {
+                    return RulerHit::EdgeBottom;
                 }
 
-                // Inside ruler body (including rounded squircle ends)
-                if u >= -half_l && u <= half_l && v >= -half_w && v <= half_w {
+                // 3. Inside ruler body: click drags ruler, strictly prevents accidental inking inside!
+                if v.abs() < half_w - 12.0 {
                     return RulerHit::Body;
                 }
+
                 RulerHit::None
             }
             RulerKind::Protractor => {
                 let rel = p - self.center;
                 let d = rel.length();
 
-                // Center dial (radius 36px)
+                // 1. Center dial (radius 36px)
                 if d <= 36.0 {
                     return RulerHit::Dial;
                 }
 
-                // Circumference edge snap
-                if (d - self.radius).abs() <= SNAP_THRESHOLD {
+                // 2. Circumference edge snap (outer measuring edge):
+                // Snap zone: 12px inside to 32px outside
+                if d >= self.radius - 12.0 && d <= self.radius + SNAP_THRESHOLD {
                     return RulerHit::ProtractorEdge;
                 }
 
-                // Inside protractor disk
-                if d <= self.radius {
+                // 3. Inside protractor disk: click drags protractor, strictly prevents accidental inking inside!
+                if d < self.radius - 12.0 {
                     return RulerHit::Body;
                 }
 
@@ -160,7 +167,7 @@ impl RulerState {
     }
 
     /// Snaps pointer position P to ruler edge or protractor circle.
-    /// Returns Some(snapped_screen_pos) if within SNAP_THRESHOLD, else None.
+    /// Returns Some(snapped_screen_pos) if along edge or clamped from interior, else None.
     pub fn snap_point(&self, p: Pos2) -> Option<Pos2> {
         if self.kind == RulerKind::None {
             return None;
@@ -173,34 +180,59 @@ impl RulerState {
                 let normal = self.normal();
                 let u = rel.dot(dir);
                 let v = rel.dot(normal);
-
-                let half_l = self.length * 0.5;
                 let half_w = self.width * 0.5;
-                let straight_limit = half_l - CORNER_RADIUS;
 
-                // Within longitudinal bounds of the straight measuring edge (+ snap margin)
-                if u >= -straight_limit - 12.0 && u <= straight_limit + 12.0 {
-                    let d_top = (v + half_w).abs();
-                    let d_bottom = (v - half_w).abs();
-
-                    if d_top.min(d_bottom) <= SNAP_THRESHOLD {
-                        let snapped_v = if d_top < d_bottom { -half_w } else { half_w };
-                        let snapped_u = u.clamp(-straight_limit, straight_limit);
-                        let snapped_p = self.center + dir * snapped_u + normal * snapped_v;
-                        return Some(snapped_p);
+                // 1. Active locked edge during inking stroke:
+                // Locks 100% of the stroke to the straight line across the entire screen!
+                match self.active_stroke_edge {
+                    ActiveRulerEdge::RulerTop => {
+                        return Some(self.center + dir * u - normal * half_w);
                     }
+                    ActiveRulerEdge::RulerBottom => {
+                        return Some(self.center + dir * u + normal * half_w);
+                    }
+                    ActiveRulerEdge::ProtractorCircumference => {}
+                    ActiveRulerEdge::None => {}
                 }
+
+                // 2. Freehand snap or stencil barrier:
+                // Top edge snap
+                if v >= -half_w - SNAP_THRESHOLD && v <= -half_w + 12.0 {
+                    return Some(self.center + dir * u - normal * half_w);
+                }
+                // Bottom edge snap
+                if v >= half_w - 12.0 && v <= half_w + SNAP_THRESHOLD {
+                    return Some(self.center + dir * u + normal * half_w);
+                }
+                // Stencil barrier: ink inside ruler body is blocked and clamped to the nearest edge
+                if v.abs() < half_w {
+                    let snapped_v = if v < 0.0 { -half_w } else { half_w };
+                    return Some(self.center + dir * u + normal * snapped_v);
+                }
+
                 None
             }
             RulerKind::Protractor => {
                 let rel = p - self.center;
                 let d = rel.length();
+                let dir = if d > 1e-4 { rel / d } else { Vec2::X };
 
-                if (d - self.radius).abs() <= SNAP_THRESHOLD {
-                    let dir = if d > 1e-4 { rel / d } else { Vec2::X };
-                    let snapped_p = self.center + dir * self.radius;
-                    return Some(snapped_p);
+                // 1. Active locked circular stroke during inking:
+                // Locks 100% of the stroke to the perfect circle circumference!
+                if self.active_stroke_edge == ActiveRulerEdge::ProtractorCircumference {
+                    return Some(self.center + dir * self.radius);
                 }
+
+                // 2. Freehand snap or stencil barrier:
+                // Circumference snap
+                if d >= self.radius - 12.0 && d <= self.radius + SNAP_THRESHOLD {
+                    return Some(self.center + dir * self.radius);
+                }
+                // Stencil barrier: ink inside protractor disk is blocked and clamped to the circumference
+                if d < self.radius {
+                    return Some(self.center + dir * self.radius);
+                }
+
                 None
             }
             RulerKind::None => None,
@@ -210,26 +242,31 @@ impl RulerState {
     /// Handle pointer events and mouse wheel rotation
     pub fn handle_events(&mut self, ui: &egui::Ui, canvas_rect: Rect) -> bool {
         if self.kind == RulerKind::None {
+            self.active_stroke_edge = ActiveRulerEdge::None;
             return false;
         }
 
         let pointer = ui.input(|i| i.pointer.clone());
         let pointer_pos = pointer.interact_pos().or(pointer.latest_pos());
 
-        // 1. Mouse wheel over ruler body rotates angle by 1 degree (or 5 degrees with Shift)
+        // 1. Mouse wheel: rotates angle by 1 deg (or 5 deg with Shift) when near dial/center
         if let Some(pos) = pointer_pos {
-            let hit = self.hit_test(pos);
-            if hit != RulerHit::None {
-                let scroll = ui.input(|i| i.raw_scroll_delta.y);
-                if scroll.abs() > 0.1 {
-                    let step = if ui.input(|i| i.modifiers.shift) {
-                        5.0_f32.to_radians()
-                    } else {
-                        1.0_f32.to_radians()
-                    };
-                    self.angle_rad += scroll.signum() * step;
-                    self.normalize_angle();
-                    return true;
+            let rel = pos - self.center;
+            // Only consume wheel rotation if near center (<= 140px) and not zooming (no Ctrl)
+            if rel.length() <= 140.0 && !ui.input(|i| i.modifiers.ctrl) {
+                let hit = self.hit_test(pos);
+                if hit != RulerHit::None {
+                    let scroll = ui.input(|i| i.raw_scroll_delta.y);
+                    if scroll.abs() > 0.1 {
+                        let step = if ui.input(|i| i.modifiers.shift) {
+                            5.0_f32.to_radians()
+                        } else {
+                            1.0_f32.to_radians()
+                        };
+                        self.angle_rad += scroll.signum() * step;
+                        self.normalize_angle();
+                        return true;
+                    }
                 }
             }
         }
@@ -238,27 +275,50 @@ impl RulerState {
         if pointer.primary_pressed() {
             if let Some(pos) = pointer_pos {
                 let hit = self.hit_test(pos);
-                if hit == RulerHit::Dial {
-                    // Double click on dial resets angle to horizontal 0 deg (or nearest 90 deg)
-                    let now = std::time::Instant::now();
-                    if now.duration_since(self.last_click_time).as_millis() < 300 {
-                        self.snap_angle_to_cardinal();
+                match hit {
+                    RulerHit::Dial => {
+                        // Double click on dial resets angle to horizontal 0 deg (or nearest 45 deg)
+                        let now = std::time::Instant::now();
+                        if now.duration_since(self.last_click_time).as_millis() < 300 {
+                            self.snap_angle_to_cardinal();
+                            self.last_click_time = now;
+                            return true;
+                        }
                         self.last_click_time = now;
+
+                        // Start rotating from dial
+                        self.is_rotating = true;
+                        self.rotate_start_angle = (pos.y - self.center.y).atan2(pos.x - self.center.x);
+                        self.rotate_initial_angle = self.angle_rad;
+                        self.active_stroke_edge = ActiveRulerEdge::None;
                         return true;
                     }
-                    self.last_click_time = now;
-
-                    // Start rotating from dial
-                    self.is_rotating = true;
-                    self.rotate_start_angle = (pos.y - self.center.y).atan2(pos.x - self.center.x);
-                    self.rotate_initial_angle = self.angle_rad;
-                    return true;
-                } else if hit == RulerHit::Body {
-                    // Start dragging ruler body
-                    self.is_dragging = true;
-                    self.drag_start_pointer = pos;
-                    self.drag_start_center = self.center;
-                    return true;
+                    RulerHit::Body => {
+                        // Start dragging ruler body - consumes event so NO ink is drawn inside!
+                        self.is_dragging = true;
+                        self.drag_start_pointer = pos;
+                        self.drag_start_center = self.center;
+                        self.active_stroke_edge = ActiveRulerEdge::None;
+                        return true;
+                    }
+                    RulerHit::EdgeTop => {
+                        // Lock stroke to Top Edge for guaranteed straight line
+                        self.active_stroke_edge = ActiveRulerEdge::RulerTop;
+                        return false; // Let app handle inking
+                    }
+                    RulerHit::EdgeBottom => {
+                        // Lock stroke to Bottom Edge for guaranteed straight line
+                        self.active_stroke_edge = ActiveRulerEdge::RulerBottom;
+                        return false; // Let app handle inking
+                    }
+                    RulerHit::ProtractorEdge => {
+                        // Lock stroke to Protractor Circumference for guaranteed circular line
+                        self.active_stroke_edge = ActiveRulerEdge::ProtractorCircumference;
+                        return false; // Let app handle inking
+                    }
+                    RulerHit::None => {
+                        self.active_stroke_edge = ActiveRulerEdge::None;
+                    }
                 }
             }
         }
@@ -277,14 +337,21 @@ impl RulerState {
                     let delta = pos - self.drag_start_pointer;
                     self.center = self.drag_start_center + delta;
                     // Clamp within canvas rect margin
-                    self.center.x = self.center.x.clamp(canvas_rect.left() + 40.0, canvas_rect.right() - 40.0);
-                    self.center.y = self.center.y.clamp(canvas_rect.top() + 40.0, canvas_rect.bottom() - 40.0);
+                    self.center.x = self
+                        .center
+                        .x
+                        .clamp(canvas_rect.left() + 40.0, canvas_rect.right() - 40.0);
+                    self.center.y = self
+                        .center
+                        .y
+                        .clamp(canvas_rect.top() + 40.0, canvas_rect.bottom() - 40.0);
                     return true;
                 }
             }
         } else {
             self.is_dragging = false;
             self.is_rotating = false;
+            self.active_stroke_edge = ActiveRulerEdge::None;
         }
 
         self.is_dragging || self.is_rotating
@@ -330,6 +397,7 @@ impl RulerState {
     }
 
     /// Generate vertices for an oriented rounded rectangle (Apple iOS Widget style squircle)
+    #[allow(dead_code)]
     pub fn oriented_rounded_rect_points(
         center: Pos2,
         dir: Vec2,
@@ -356,8 +424,18 @@ impl RulerState {
         let corners = [
             (inner_l, -inner_w, -std::f32::consts::FRAC_PI_2, 0.0_f32),
             (inner_l, inner_w, 0.0_f32, std::f32::consts::FRAC_PI_2),
-            (-inner_l, inner_w, std::f32::consts::FRAC_PI_2, std::f32::consts::PI),
-            (-inner_l, -inner_w, std::f32::consts::PI, std::f32::consts::PI * 1.5_f32),
+            (
+                -inner_l,
+                inner_w,
+                std::f32::consts::FRAC_PI_2,
+                std::f32::consts::PI,
+            ),
+            (
+                -inner_l,
+                -inner_w,
+                std::f32::consts::PI,
+                std::f32::consts::PI * 1.5_f32,
+            ),
         ];
 
         for (cu, cv, start_a, end_a) in corners {
@@ -376,60 +454,51 @@ impl RulerState {
     fn render_straight_ruler(&self, painter: &Painter, p: &Palette, is_dark: bool) {
         let dir = self.dir();
         let normal = self.normal();
-        let half_l = self.length * 0.5;
+        let half_l = (self.length * 0.5).max(3200.0);
         let half_w = self.width * 0.5;
-        let straight_limit = half_l - CORNER_RADIUS;
 
-        // 1. Apple-style Multi-Layered Frosted Glass Shadows
-        // Layer A: Ambient soft contact shadow
-        let shadow_ambient = Self::oriented_rounded_rect_points(
-            self.center + Vec2::new(0.0, 3.0),
-            dir,
-            normal,
-            self.length + 2.0,
-            self.width + 2.0,
-            CORNER_RADIUS + 1.0,
-            5,
-        );
+        // 1. Full-screen length translucent frosted glass body (no rounded end caps)
+        let p_top_l = self.center - dir * half_l - normal * half_w;
+        let p_top_r = self.center + dir * half_l - normal * half_w;
+        let p_bot_r = self.center + dir * half_l + normal * half_w;
+        let p_bot_l = self.center - dir * half_l + normal * half_w;
+
+        // Ambient contact shadow
+        let s_top_l = p_top_l + Vec2::new(0.0, 2.0);
+        let s_top_r = p_top_r + Vec2::new(0.0, 2.0);
+        let s_bot_r = p_bot_r + Vec2::new(0.0, 2.0);
+        let s_bot_l = p_bot_l + Vec2::new(0.0, 2.0);
         painter.add(egui::Shape::convex_polygon(
-            shadow_ambient,
-            if is_dark { Color32::from_black_alpha(55) } else { Color32::from_black_alpha(20) },
+            vec![s_top_l, s_top_r, s_bot_r, s_bot_l],
+            if is_dark {
+                Color32::from_black_alpha(45)
+            } else {
+                Color32::from_black_alpha(15)
+            },
             Stroke::NONE,
         ));
 
-        // Layer B: Deep elevation drop shadow (creates the floating iOS widget depth)
-        let shadow_depth = Self::oriented_rounded_rect_points(
-            self.center + Vec2::new(0.0, 10.0),
-            dir,
-            normal,
-            self.length,
-            self.width,
-            CORNER_RADIUS,
-            5,
-        );
+        // Elevation drop shadow
+        let d_top_l = p_top_l + Vec2::new(0.0, 8.0);
+        let d_top_r = p_top_r + Vec2::new(0.0, 8.0);
+        let d_bot_r = p_bot_r + Vec2::new(0.0, 8.0);
+        let d_bot_l = p_bot_l + Vec2::new(0.0, 8.0);
         painter.add(egui::Shape::convex_polygon(
-            shadow_depth,
-            if is_dark { Color32::from_black_alpha(90) } else { Color32::from_black_alpha(32) },
+            vec![d_top_l, d_top_r, d_bot_r, d_bot_l],
+            if is_dark {
+                Color32::from_black_alpha(75)
+            } else {
+                Color32::from_black_alpha(25)
+            },
             Stroke::NONE,
         ));
 
-        // 2. Apple iOS Widget Translucent Frosted Glass Body
-        let body_pts = Self::oriented_rounded_rect_points(
-            self.center,
-            dir,
-            normal,
-            self.length,
-            self.width,
-            CORNER_RADIUS,
-            6,
-        );
         // Translucent frosted glass tint: very clear so you can read text & grid underneath!
         let body_fill = if is_dark {
             Color32::from_rgba_unmultiplied(22, 28, 38, 155) // 60% opacity dark acrylic
         } else {
             Color32::from_rgba_unmultiplied(255, 255, 255, 165) // 64% opacity luminous glass
         };
-        // Apple Signature Specular Highlight Rim (Viền kính bắt sáng kiểu iPhone widget)
         let rim_stroke = Stroke::new(
             1.2_f32,
             if is_dark {
@@ -438,14 +507,17 @@ impl RulerState {
                 Color32::from_rgba_unmultiplied(255, 255, 255, 230)
             },
         );
-        painter.add(egui::Shape::convex_polygon(body_pts, body_fill, rim_stroke));
+        painter.add(egui::Shape::convex_polygon(
+            vec![p_top_l, p_top_r, p_bot_r, p_bot_l],
+            body_fill,
+            rim_stroke,
+        ));
 
-        // 3. Apple Subsurface Bevel Reflection (Vệt sáng phản xạ nhẹ mép trên)
-        let sheen_l = straight_limit - 4.0;
-        let sheen_start = self.center - dir * sheen_l - normal * (half_w - 2.0);
-        let sheen_end = self.center + dir * sheen_l - normal * (half_w - 2.0);
+        // Subsurface Bevel Reflection (Vệt sáng phản xạ nhẹ mép trên)
+        let sheen_top_l = self.center - dir * half_l - normal * (half_w - 2.0);
+        let sheen_top_r = self.center + dir * half_l - normal * (half_w - 2.0);
         painter.line_segment(
-            [sheen_start, sheen_end],
+            [sheen_top_l, sheen_top_r],
             Stroke::new(
                 1.0_f32,
                 if is_dark {
@@ -456,31 +528,46 @@ impl RulerState {
             ),
         );
 
-        // 4. Subtle Snap Edge Accent Guidelines (Đường chỉ dẫn mép thước sắc nét)
-        let p_edge_top_l = self.center - dir * straight_limit - normal * half_w;
-        let p_edge_top_r = self.center + dir * straight_limit - normal * half_w;
+        // Snap Edge Accent Guidelines (Đường chỉ dẫn mép thước sắc nét)
         painter.line_segment(
-            [p_edge_top_l, p_edge_top_r],
+            [p_top_l, p_top_r],
             Stroke::new(1.0_f32, p.accent.gamma_multiply(0.40)),
         );
-        let p_edge_bot_l = self.center - dir * straight_limit + normal * half_w;
-        let p_edge_bot_r = self.center + dir * straight_limit + normal * half_w;
         painter.line_segment(
-            [p_edge_bot_l, p_edge_bot_r],
+            [p_bot_l, p_bot_r],
             Stroke::new(1.0_f32, p.accent.gamma_multiply(0.30)),
         );
 
-        // 5. Ruler Ticks & Numeric Labels along straight edges
+        // Ticks & Numeric Labels along visible portion of the straight edges
         let tick_color = p.text_muted.gamma_multiply(0.85);
         let major_tick_color = p.text;
-        let num_ticks = (self.length / 8.0) as i32;
 
-        for i in -num_ticks / 2..=num_ticks / 2 {
-            let offset_x = i as f32 * 8.0;
-            // Only place ticks along the 100% straight measuring edge
-            if offset_x.abs() > straight_limit - 4.0 {
-                continue;
+        let clip = painter.clip_rect();
+        let corners = [
+            clip.left_top(),
+            clip.right_top(),
+            clip.left_bottom(),
+            clip.right_bottom(),
+        ];
+        let mut min_u = f32::MAX;
+        let mut max_u = f32::MIN;
+        for c in corners {
+            let u = (c - self.center).dot(dir);
+            if u < min_u {
+                min_u = u;
             }
+            if u > max_u {
+                max_u = u;
+            }
+        }
+        min_u = (min_u - 50.0).max(-half_l);
+        max_u = (max_u + 50.0).min(half_l);
+
+        let start_tick = (min_u / 8.0).floor() as i32;
+        let end_tick = (max_u / 8.0).ceil() as i32;
+
+        for i in start_tick..=end_tick {
+            let offset_x = i as f32 * 8.0;
 
             let is_cm = i % 10 == 0;
             let is_half_cm = i % 5 == 0 && !is_cm;
@@ -515,8 +602,8 @@ impl RulerState {
                 ),
             );
 
-            // Number label for cm
-            if is_cm && offset_x.abs() > 36.0 {
+            // Number label for cm (skip near center dial so it doesn't overlap dial)
+            if is_cm && offset_x.abs() > 42.0 {
                 let cm_num = (offset_x / 80.0).abs().round() as i32;
                 let text_pos = p_tick_top + normal * 7.0;
                 painter.text(
@@ -529,7 +616,7 @@ impl RulerState {
             }
         }
 
-        // 6. Center Dial (Apple Style)
+        // Center Dial (Apple Style)
         self.render_center_dial(painter, p, is_dark);
     }
 
@@ -542,13 +629,21 @@ impl RulerState {
         painter.circle_filled(
             center + Vec2::new(0.0, 3.0),
             radius + 2.0,
-            if is_dark { Color32::from_black_alpha(55) } else { Color32::from_black_alpha(20) },
+            if is_dark {
+                Color32::from_black_alpha(55)
+            } else {
+                Color32::from_black_alpha(20)
+            },
         );
         // Deep depth shadow
         painter.circle_filled(
             center + Vec2::new(0.0, 10.0),
             radius,
-            if is_dark { Color32::from_black_alpha(90) } else { Color32::from_black_alpha(32) },
+            if is_dark {
+                Color32::from_black_alpha(90)
+            } else {
+                Color32::from_black_alpha(32)
+            },
         );
 
         // 2. Apple iOS Widget Translucent Frosted Glass Disk
@@ -569,11 +664,23 @@ impl RulerState {
         painter.circle(center, radius, fill, rim_stroke);
 
         // Outer circumference accent guideline
-        painter.circle_stroke(center, radius, Stroke::new(1.0_f32, p.accent.gamma_multiply(0.40)));
+        painter.circle_stroke(
+            center,
+            radius,
+            Stroke::new(1.0_f32, p.accent.gamma_multiply(0.40)),
+        );
 
         // 3. Inner guideline rings
-        painter.circle_stroke(center, radius * 0.70, Stroke::new(0.8_f32, p.border.gamma_multiply(0.6)));
-        painter.circle_stroke(center, radius * 0.35, Stroke::new(0.8_f32, p.border.gamma_multiply(0.5)));
+        painter.circle_stroke(
+            center,
+            radius * 0.70,
+            Stroke::new(0.8_f32, p.border.gamma_multiply(0.6)),
+        );
+        painter.circle_stroke(
+            center,
+            radius * 0.35,
+            Stroke::new(0.8_f32, p.border.gamma_multiply(0.5)),
+        );
 
         // 4. Degree ticks and labels around the circle
         for deg in (0..360).step_by(5) {
@@ -640,7 +747,11 @@ impl RulerState {
         painter.circle_filled(
             center + Vec2::new(0.0, 2.5),
             dial_r + 1.0,
-            if is_dark { Color32::from_black_alpha(60) } else { Color32::from_black_alpha(25) },
+            if is_dark {
+                Color32::from_black_alpha(60)
+            } else {
+                Color32::from_black_alpha(25)
+            },
         );
 
         // Dial base - matching frosted glass
@@ -671,7 +782,10 @@ impl RulerState {
 
         // Angle indicator arrow
         let dir = self.dir();
-        painter.line_segment([center, center + dir * 21.0], Stroke::new(2.0_f32, p.accent));
+        painter.line_segment(
+            [center, center + dir * 21.0],
+            Stroke::new(2.0_f32, p.accent),
+        );
 
         // Numeric angle label
         let deg_text = format!("{:.0}°", self.angle_degrees());
@@ -696,7 +810,7 @@ mod tests {
             center: Pos2::new(200.0, 200.0),
             angle_rad: 0.0, // Horizontal
             length: 400.0,
-            width: 80.0,    // Top edge at y = 160, bottom edge at y = 240
+            width: 80.0, // Top edge at y = 160, bottom edge at y = 240
             ..Default::default()
         };
 
@@ -729,5 +843,64 @@ mod tests {
         let sp = snapped.unwrap();
         assert!((sp.x - 150.0).abs() < 1e-3);
         assert!((sp.y - 100.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_ruler_full_screen_length_and_body_barrier() {
+        let mut ruler = RulerState {
+            kind: RulerKind::Ruler,
+            center: Pos2::new(200.0, 200.0),
+            angle_rad: 0.0, // Horizontal
+            length: 6000.0,
+            width: 80.0, // Top edge at y = 160, bottom edge at y = 240
+            ..Default::default()
+        };
+
+        // 1. Far away along x-axis (e.g. x = 2500) still snaps smoothly (full-screen length)
+        let far_x = Pos2::new(2500.0, 162.0);
+        let snapped_far = ruler.snap_point(far_x);
+        assert!(snapped_far.is_some());
+        assert_eq!(snapped_far.unwrap().y, 160.0);
+
+        // 2. Pointer deep inside body (y = 200) is clamped to nearest edge, NEVER inside body!
+        let inside_p = Pos2::new(300.0, 200.0);
+        let clamped = ruler.snap_point(inside_p);
+        assert!(clamped.is_some());
+        assert!(clamped.unwrap().y == 160.0 || clamped.unwrap().y == 240.0);
+
+        // 3. Active locked edge: when drawing top edge, points stay 100% on y = 160
+        ruler.active_stroke_edge = ActiveRulerEdge::RulerTop;
+        let wandering_p = Pos2::new(450.0, 195.0); // Hand slipped into body
+        let locked_sp = ruler.snap_point(wandering_p);
+        assert!(locked_sp.is_some());
+        assert_eq!(locked_sp.unwrap().x, 450.0);
+        assert_eq!(locked_sp.unwrap().y, 160.0);
+    }
+
+    #[test]
+    fn test_protractor_body_barrier_and_lock() {
+        let mut protractor = RulerState {
+            kind: RulerKind::Protractor,
+            center: Pos2::new(200.0, 200.0),
+            radius: 100.0,
+            ..Default::default()
+        };
+
+        // 1. Pointer inside disk (d = 40.0) is clamped to outer circumference
+        let inside_p = Pos2::new(240.0, 200.0);
+        let clamped = protractor.snap_point(inside_p);
+        assert!(clamped.is_some());
+        let sp = clamped.unwrap();
+        assert_eq!(sp.x, 300.0); // 200 + 100
+        assert_eq!(sp.y, 200.0);
+
+        // 2. Active locked circumference: stroke stays 100% on circle
+        protractor.active_stroke_edge = ActiveRulerEdge::ProtractorCircumference;
+        let wandering_p = Pos2::new(200.0, 150.0); // Slipped towards center (d = 50)
+        let locked_sp = protractor.snap_point(wandering_p);
+        assert!(locked_sp.is_some());
+        let sp = locked_sp.unwrap();
+        assert_eq!(sp.x, 200.0);
+        assert_eq!(sp.y, 100.0); // 200 - 100 radius
     }
 }

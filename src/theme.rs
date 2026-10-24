@@ -23,73 +23,191 @@ impl Palette {
     pub fn get(dark: bool) -> Self {
         if dark {
             Self {
-                accent: Color32::from_rgb(96, 165, 250),
-                accent_soft: Color32::from_rgba_unmultiplied(96, 165, 250, 40),
-                on_accent: Color32::from_rgb(15, 23, 42),
-                desk: Color32::from_rgb(17, 20, 25),
-                surface: Color32::from_rgb(28, 32, 39),
-                surface_alt: Color32::from_rgb(38, 43, 52),
-                border: Color32::from_rgb(52, 58, 68),
-                text: Color32::from_rgb(226, 232, 240),
-                text_muted: Color32::from_rgb(148, 158, 172),
-                hover: Color32::from_rgb(45, 51, 61),
-                success: Color32::from_rgb(74, 222, 128),
-                danger: Color32::from_rgb(248, 113, 113),
-                shadow: Color32::from_black_alpha(110),
+                // Inkk signature warm Brick Red accent
+                accent: Color32::from_rgb(212, 98, 82), // #D46252
+                accent_soft: Color32::from_rgba_unmultiplied(212, 98, 82, 45),
+                on_accent: Color32::from_rgb(255, 252, 248),
+                desk: Color32::from_rgb(22, 20, 18), // Deep warm dark desk #161412
+                surface: Color32::from_rgb(31, 28, 25), // Warm dark surface #1F1C19
+                surface_alt: Color32::from_rgb(41, 38, 34), // Warm dark card/panel #292622
+                border: Color32::from_rgb(59, 54, 47), // Warm dark border #3B362F
+                text: Color32::from_rgb(237, 230, 220), // Warm ivory text #EDE6DC
+                text_muted: Color32::from_rgb(158, 150, 137), // Warm muted text #9E9689
+                hover: Color32::from_rgb(53, 49, 43), // Warm hover #35312B
+                success: Color32::from_rgb(86, 175, 102),
+                danger: Color32::from_rgb(225, 85, 75),
+                shadow: Color32::from_black_alpha(140),
             }
         } else {
             Self {
-                accent: Color32::from_rgb(37, 99, 235),
-                accent_soft: Color32::from_rgba_unmultiplied(37, 99, 235, 28),
+                // Inkk signature warm Brick Red accent
+                accent: Color32::from_rgb(185, 75, 60), // #B94B3C
+                accent_soft: Color32::from_rgba_unmultiplied(185, 75, 60, 32),
                 on_accent: Color32::WHITE,
-                desk: Color32::from_rgb(236, 240, 245),
-                surface: Color32::from_rgb(255, 255, 255),
-                surface_alt: Color32::from_rgb(244, 246, 249),
-                border: Color32::from_rgb(222, 227, 234),
-                text: Color32::from_rgb(30, 41, 59),
-                text_muted: Color32::from_rgb(100, 116, 139),
-                hover: Color32::from_rgb(237, 241, 246),
-                success: Color32::from_rgb(22, 163, 74),
-                danger: Color32::from_rgb(220, 38, 38),
-                shadow: Color32::from_black_alpha(30),
+                desk: Color32::from_rgb(235, 228, 216), // Warm parchment desk #EBE4D8
+                surface: Color32::from_rgb(247, 244, 238), // Warm cream surface #F7F4EE
+                surface_alt: Color32::from_rgb(238, 232, 220), // Warm cream-alt #EEE8DC
+                border: Color32::from_rgb(223, 215, 203), // Warm subtle border #DFD7CB
+                text: Color32::from_rgb(32, 30, 27),    // Ink black #201E1B
+                text_muted: Color32::from_rgb(117, 110, 99), // Warm muted text #756E63
+                hover: Color32::from_rgb(228, 221, 208), // Warm hover #E4DDD0
+                success: Color32::from_rgb(46, 133, 64),
+                danger: Color32::from_rgb(195, 45, 45),
+                shadow: Color32::from_black_alpha(35),
             }
         }
     }
 }
 
-pub const RADIUS: f32 = 8.0;
-pub const RADIUS_SMALL: f32 = 6.0;
-pub const TOOL_BUTTON_SIZE: f32 = 34.0;
-pub const SWATCH_SIZE: f32 = 24.0;
+// Unified Design Tokens
+// 1. Three corner rounding tiers
+pub const RADIUS_SM: f32 = 4.0;
+pub const RADIUS_MD: f32 = 8.0;
+#[allow(dead_code)]
+pub const RADIUS_LG: f32 = 14.0;
+pub const RADIUS: f32 = RADIUS_MD;
+pub const RADIUS_SMALL: f32 = RADIUS_SM;
+
+// 2. Spacing scale (4, 8, 12, 16, 24)
+#[allow(dead_code)]
+pub const SPACE_XS: f32 = 4.0;
+pub const SPACE_SM: f32 = 8.0;
+pub const SPACE_MD: f32 = 12.0;
+#[allow(dead_code)]
+pub const SPACE_LG: f32 = 16.0;
+#[allow(dead_code)]
+pub const SPACE_XL: f32 = 24.0;
+
+// Dimensions
+pub const TOOL_BUTTON_SIZE: f32 = 32.0;
+#[allow(dead_code)]
+pub const SWATCH_SIZE: f32 = 22.0;
 pub const TOAST_SECS: f32 = 3.0;
 
-/// Default ink colors offered as quick swatches.
-pub const INK_SWATCHES: [(Color32, &str); 7] = [
-    (Color32::from_rgb(15, 23, 42), "Black"),
-    (Color32::from_rgb(220, 38, 38), "Red"),
-    (Color32::from_rgb(37, 99, 235), "Blue"),
-    (Color32::from_rgb(22, 163, 74), "Green"),
-    (Color32::from_rgb(234, 179, 8), "Yellow"),
-    (Color32::from_rgb(147, 51, 234), "Purple"),
-    (Color32::from_rgb(248, 250, 252), "White"),
+/// Curated Archival Inks for Inkk stationery.
+pub const INK_SWATCHES: [(Color32, &str); 9] = [
+    (Color32::from_rgb(31, 30, 27), "Sumi Ink"),   // #1F1E1B
+    (Color32::from_rgb(185, 75, 60), "Brick Red"), // #B94B3C
+    (Color32::from_rgb(43, 76, 111), "Prussian Blue"), // #2B4C6F
+    (Color32::from_rgb(74, 59, 50), "Sepia"),      // #4A3B32
+    (Color32::from_rgb(62, 92, 61), "Forest Moss"), // #3E5C3D
+    (Color32::from_rgb(200, 138, 44), "Warm Amber"), // #C88A2C
+    (Color32::from_rgb(94, 60, 88), "Plum"),       // #5E3C58
+    (Color32::from_rgb(110, 115, 120), "Graphite"), // #6E7378
+    (Color32::from_rgb(250, 247, 242), "Chalk White"), // #FAF7F2
 ];
-pub const DEFAULT_INK_LIGHT: Color32 = Color32::from_rgb(15, 23, 42);
-pub const DEFAULT_INK_DARK: Color32 = Color32::from_rgb(248, 250, 252);
 
-pub fn ink_swatches(dark: bool) -> [(Color32, &'static str); 7] {
+pub const DEFAULT_INK_LIGHT: Color32 = Color32::from_rgb(31, 30, 27);
+#[allow(dead_code)]
+pub const DEFAULT_INK_DARK: Color32 = Color32::from_rgb(250, 247, 242);
+
+pub fn ink_swatches(dark: bool) -> [(Color32, &'static str); 9] {
     if dark {
         [
-            (DEFAULT_INK_DARK, "White"),
-            (Color32::from_rgb(248, 113, 113), "Red"),
-            (Color32::from_rgb(96, 165, 250), "Blue"),
-            (Color32::from_rgb(74, 222, 128), "Green"),
-            (Color32::from_rgb(250, 204, 21), "Yellow"),
-            (Color32::from_rgb(192, 132, 252), "Purple"),
-            (Color32::from_rgb(15, 23, 42), "Black"),
+            (Color32::from_rgb(250, 247, 242), "Chalk White"),
+            (Color32::from_rgb(212, 98, 82), "Brick Red"),
+            (Color32::from_rgb(110, 155, 205), "Soft Prussian"),
+            (Color32::from_rgb(180, 155, 135), "Warm Sepia"),
+            (Color32::from_rgb(120, 175, 120), "Moss Green"),
+            (Color32::from_rgb(225, 175, 80), "Warm Amber"),
+            (Color32::from_rgb(180, 130, 175), "Plum Mist"),
+            (Color32::from_rgb(150, 155, 160), "Silver Grey"),
+            (Color32::from_rgb(31, 30, 27), "Sumi Ink"),
         ]
     } else {
         INK_SWATCHES
     }
+}
+
+/// Setup typography: loads Georgia serif font when available on Windows with robust fallbacks
+pub fn setup_fonts(ctx: &egui::Context) {
+    static INIT: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    INIT.get_or_init(|| {
+        let mut fonts = egui::FontDefinitions::default();
+        let prop_fonts: Vec<String> = fonts
+            .families
+            .get(&egui::FontFamily::Proportional)
+            .cloned()
+            .unwrap_or_default();
+        let serif_family = fonts
+            .families
+            .entry(egui::FontFamily::Name("serif".into()))
+            .or_default();
+        if let Ok(bytes) = std::fs::read("C:\\Windows\\Fonts\\georgia.ttf") {
+            fonts
+                .font_data
+                .insert("georgia".to_owned(), egui::FontData::from_owned(bytes));
+            serif_family.insert(0, "georgia".to_owned());
+        } else if let Ok(bytes) = std::fs::read("C:\\Windows\\Fonts\\times.ttf") {
+            fonts
+                .font_data
+                .insert("times".to_owned(), egui::FontData::from_owned(bytes));
+            serif_family.insert(0, "times".to_owned());
+        }
+        for f in prop_fonts {
+            if !serif_family.contains(&f) {
+                serif_family.push(f);
+            }
+        }
+        ctx.set_fonts(fonts);
+    });
+}
+
+/// Helper to request Georgia serif font for soulful headings, titles, and brand wordmark.
+pub fn font_serif(size: f32) -> egui::FontId {
+    egui::FontId::new(size, egui::FontFamily::Name("serif".into()))
+}
+
+/// Convert sRGB Color32 to HSV components (H: 0..=1, S: 0..=1, V: 0..=1).
+pub fn rgb_to_hsv(c: Color32) -> (f32, f32, f32) {
+    let r = c.r() as f32 / 255.0;
+    let g = c.g() as f32 / 255.0;
+    let b = c.b() as f32 / 255.0;
+
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+
+    let v = max;
+    let s = if max > 1e-5 { delta / max } else { 0.0 };
+
+    let h = if delta <= 1e-5 {
+        0.0
+    } else if (max - r).abs() < 1e-5 {
+        let h_raw = (g - b) / delta;
+        h_raw.rem_euclid(6.0) / 6.0
+    } else if (max - g).abs() < 1e-5 {
+        (((b - r) / delta) + 2.0) / 6.0
+    } else {
+        (((r - g) / delta) + 4.0) / 6.0
+    };
+
+    (h.clamp(0.0, 1.0), s.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+}
+
+/// Convert HSV components (H, S, V in 0..=1) to sRGB Color32.
+pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Color32 {
+    let h_norm = h.rem_euclid(1.0) * 6.0;
+    let i = h_norm.floor() as i32;
+    let f = h_norm - i as f32;
+    let p = v * (1.0 - s);
+    let q = v * (1.0 - s * f);
+    let t = v * (1.0 - s * (1.0 - f));
+
+    let (r, g, b) = match i % 6 {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        _ => (v, p, q),
+    };
+
+    Color32::from_rgb(
+        (r * 255.0).clamp(0.0, 255.0).round() as u8,
+        (g * 255.0).clamp(0.0, 255.0).round() as u8,
+        (b * 255.0).clamp(0.0, 255.0).round() as u8,
+    )
 }
 
 /// Convert RGB [0..255] to HSL (H: 0..360, S: 0..1, L: 0..1)
@@ -263,16 +381,55 @@ pub mod icon {
 
     #[cfg_attr(not(test), allow(dead_code))]
     pub const ALL: &[&str] = &[
-        PEN, HIGHLIGHTER, ERASER_STROKE, ERASER_POINT, LASSO, PAN, UNDO, REDO, SUN, MOON, PAGES,
-        OPEN, SAVE, ADD, PREV, NEXT, EXTEND, FIT, DUPLICATE, DELETE, CLOSE, CHECK, WARN,
-        NOTEBOOK, RULER, PROTRACTOR, PICTURE, "↗", "➡", "↔", "☐", "○", "⏶", "⬟", "⬣", "☆", "−", "+",
+        PEN,
+        HIGHLIGHTER,
+        ERASER_STROKE,
+        ERASER_POINT,
+        LASSO,
+        PAN,
+        UNDO,
+        REDO,
+        SUN,
+        MOON,
+        PAGES,
+        OPEN,
+        SAVE,
+        ADD,
+        PREV,
+        NEXT,
+        EXTEND,
+        FIT,
+        DUPLICATE,
+        DELETE,
+        CLOSE,
+        CHECK,
+        WARN,
+        NOTEBOOK,
+        RULER,
+        PROTRACTOR,
+        PICTURE,
+        "↗",
+        "➡",
+        "↔",
+        "☐",
+        "○",
+        "⏶",
+        "⬟",
+        "⬣",
+        "☆",
+        "−",
+        "+",
     ];
 }
 
 /// Builds egui visuals on top of the stock light/dark theme using the palette.
 pub fn visuals(dark: bool) -> egui::Visuals {
     let p = Palette::get(dark);
-    let mut v = if dark { egui::Visuals::dark() } else { egui::Visuals::light() };
+    let mut v = if dark {
+        egui::Visuals::dark()
+    } else {
+        egui::Visuals::light()
+    };
 
     v.panel_fill = p.surface;
     v.window_fill = p.surface;
@@ -281,8 +438,18 @@ pub fn visuals(dark: bool) -> egui::Visuals {
     v.window_stroke = Stroke::new(1.0_f32, p.border);
     v.window_rounding = Rounding::same(RADIUS + 2.0);
     v.menu_rounding = Rounding::same(RADIUS);
-    v.window_shadow = egui::Shadow { offset: Vec2::new(0.0, 6.0), blur: 18.0, spread: 0.0, color: p.shadow };
-    v.popup_shadow = egui::Shadow { offset: Vec2::new(0.0, 4.0), blur: 12.0, spread: 0.0, color: p.shadow };
+    v.window_shadow = egui::Shadow {
+        offset: Vec2::new(0.0, 6.0),
+        blur: 18.0,
+        spread: 0.0,
+        color: p.shadow,
+    };
+    v.popup_shadow = egui::Shadow {
+        offset: Vec2::new(0.0, 4.0),
+        blur: 12.0,
+        spread: 0.0,
+        color: p.shadow,
+    };
     v.selection.bg_fill = p.accent;
     v.selection.stroke = Stroke::new(1.0_f32, p.on_accent);
     v.hyperlink_color = p.accent;
@@ -311,10 +478,11 @@ pub fn visuals(dark: bool) -> egui::Visuals {
 
 /// Applies visuals plus spacing tweaks to the context.
 pub fn apply(ctx: &egui::Context, dark: bool) {
+    setup_fonts(ctx);
     ctx.set_visuals(visuals(dark));
     ctx.style_mut(|s| {
-        s.spacing.item_spacing = Vec2::new(6.0, 6.0);
-        s.spacing.button_padding = Vec2::new(10.0, 5.0);
+        s.spacing.item_spacing = Vec2::new(SPACE_SM, SPACE_SM);
+        s.spacing.button_padding = Vec2::new(SPACE_MD, SPACE_SM);
         s.spacing.interact_size.y = 28.0;
         s.spacing.slider_width = 110.0;
     });
@@ -332,7 +500,11 @@ mod tests {
         let _ = ctx.run(Default::default(), |_| {});
         let font = egui::FontId::proportional(16.0);
         let missing: Vec<&str> = ctx.fonts(|f| {
-            icon::ALL.iter().copied().filter(|s| !f.has_glyphs(&font, s)).collect()
+            icon::ALL
+                .iter()
+                .copied()
+                .filter(|s| !f.has_glyphs(&font, s))
+                .collect()
         });
         assert!(missing.is_empty(), "missing glyphs: {missing:?}");
     }
@@ -364,23 +536,71 @@ mod tests {
         let (h_orig, _, _) = rgb_to_hsl(blue[0], blue[1], blue[2]);
         let blue_dark = adapt_color_to_dark(blue);
         let (h_adapted, _, l_adapted) = rgb_to_hsl(blue_dark[0], blue_dark[1], blue_dark[2]);
-        assert!((h_orig - h_adapted).abs() < 2.0, "Hue must be preserved for blue");
-        assert!(l_adapted >= 0.65, "Lightness must be lifted for readability on dark paper");
+        assert!(
+            (h_orig - h_adapted).abs() < 2.0,
+            "Hue must be preserved for blue"
+        );
+        assert!(
+            l_adapted >= 0.65,
+            "Lightness must be lifted for readability on dark paper"
+        );
 
         // Red ink
         let red = [220, 38, 38, 255];
         let (h_red_orig, _, _) = rgb_to_hsl(red[0], red[1], red[2]);
         let red_dark = adapt_color_to_dark(red);
         let (h_red_adapted, _, l_red_adapted) = rgb_to_hsl(red_dark[0], red_dark[1], red_dark[2]);
-        assert!((h_red_orig - h_red_adapted).abs() < 2.0, "Hue must be preserved for red");
-        assert!(l_red_adapted >= 0.65, "Red must be lifted into vibrant coral/pink");
+        assert!(
+            (h_red_orig - h_red_adapted).abs() < 2.0,
+            "Hue must be preserved for red"
+        );
+        assert!(
+            l_red_adapted >= 0.65,
+            "Red must be lifted into vibrant coral/pink"
+        );
 
         // Green ink
         let green = [22, 163, 74, 255];
         let (h_green_orig, _, _) = rgb_to_hsl(green[0], green[1], green[2]);
         let green_dark = adapt_color_to_dark(green);
-        let (h_green_adapted, _, l_green_adapted) = rgb_to_hsl(green_dark[0], green_dark[1], green_dark[2]);
-        assert!((h_green_orig - h_green_adapted).abs() < 2.0, "Hue must be preserved for green");
-        assert!(l_green_adapted >= 0.65, "Green must be lifted into vibrant mint/emerald");
+        let (h_green_adapted, _, l_green_adapted) =
+            rgb_to_hsl(green_dark[0], green_dark[1], green_dark[2]);
+        assert!(
+            (h_green_orig - h_green_adapted).abs() < 2.0,
+            "Hue must be preserved for green"
+        );
+        assert!(
+            l_green_adapted >= 0.65,
+            "Green must be lifted into vibrant mint/emerald"
+        );
+    }
+
+    #[test]
+    fn test_rgb_hsv_roundtrip() {
+        use super::{hsv_to_rgb, rgb_to_hsv};
+        use eframe::egui::Color32;
+
+        let colors = [
+            Color32::from_rgb(255, 0, 0),     // Red
+            Color32::from_rgb(0, 255, 0),     // Green
+            Color32::from_rgb(0, 0, 255),     // Blue
+            Color32::from_rgb(255, 255, 255), // White
+            Color32::from_rgb(0, 0, 0),       // Black
+            Color32::from_rgb(163, 35, 141),  // Purple (#A3238D)
+            Color32::from_rgb(185, 75, 60),   // Brick Red
+            Color32::from_rgb(43, 76, 111),   // Prussian Blue
+        ];
+
+        for &c in &colors {
+            let (h, s, v) = rgb_to_hsv(c);
+            let recon = hsv_to_rgb(h, s, v);
+            let diff_r = (c.r() as i16 - recon.r() as i16).abs();
+            let diff_g = (c.g() as i16 - recon.g() as i16).abs();
+            let diff_b = (c.b() as i16 - recon.b() as i16).abs();
+            assert!(
+                diff_r <= 1 && diff_g <= 1 && diff_b <= 1,
+                "Failed for {c:?}: got {recon:?}"
+            );
+        }
     }
 }

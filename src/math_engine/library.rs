@@ -1,7 +1,7 @@
 //! Library and Package Management for Inkk MathEngine
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 
 use crate::math_engine::ast::{FunctionMetadata, StmtKind, UserFunctionAst};
 use crate::math_engine::error::MathError;
@@ -70,7 +70,10 @@ impl LibraryManager {
             if matches!(entry.kind, FunctionKind::Builtin(_)) {
                 return Err((
                     1,
-                    format!("Cannot define '{}': name is a built-in function.", expected_name),
+                    format!(
+                        "Cannot define '{}': name is a built-in function.",
+                        expected_name
+                    ),
                 ));
             }
         }
@@ -90,24 +93,39 @@ impl LibraryManager {
         })?;
 
         let mut stmts = script.stmts.into_iter();
-        let first_stmt = stmts.next().ok_or((1, "File contains no statements".to_string()))?;
+        let first_stmt = stmts
+            .next()
+            .ok_or((1, "File contains no statements".to_string()))?;
 
         let (mut main_ast, main_meta) = match first_stmt.kind {
             StmtKind::FunctionDef { ast, metadata } => (ast, metadata),
-            _ => return Err((first_stmt.line, format!("File '{}' must define function '{}'", filename, expected_name))),
+            _ => {
+                return Err((
+                    first_stmt.line,
+                    format!(
+                        "File '{}' must define function '{}'",
+                        filename, expected_name
+                    ),
+                ))
+            }
         };
 
         if main_ast.name != expected_name {
             return Err((
                 first_stmt.line,
-                format!("Function name '{}' does not match filename '{}'", main_ast.name, filename),
+                format!(
+                    "Function name '{}' does not match filename '{}'",
+                    main_ast.name, filename
+                ),
             ));
         }
 
         // Subsequent functions in the file become local functions
         for stmt in stmts {
             if let StmtKind::FunctionDef { ast: local_ast, .. } = stmt.kind {
-                main_ast.local_functions.insert(local_ast.name.clone(), local_ast);
+                main_ast
+                    .local_functions
+                    .insert(local_ast.name.clone(), local_ast);
             }
         }
 
@@ -162,7 +180,11 @@ impl LibraryManager {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("m") {
-                    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+                    let file_name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_string();
                     let content = match fs::read_to_string(&path) {
                         Ok(c) => c,
                         Err(e) => {
@@ -234,15 +256,24 @@ pub fn load_embedded_functions(
 ) -> Vec<Result<String, String>> {
     let mut results = Vec::new();
     for ef in funcs {
-        match LibraryManager::parse_function_source(&format!("{}.m", ef.name), &ef.source, ef.library.as_deref(), evaluator) {
-            Ok((ast, meta)) => {
-                match evaluator.registry.register_user(ast, meta) {
-                    Ok(_) => results.push(Ok(ef.name.clone())),
-                    Err(e) => results.push(Err(format!("Error loading embedded function '{}': {}", ef.name, e))),
-                }
-            }
+        match LibraryManager::parse_function_source(
+            &format!("{}.m", ef.name),
+            &ef.source,
+            ef.library.as_deref(),
+            evaluator,
+        ) {
+            Ok((ast, meta)) => match evaluator.registry.register_user(ast, meta) {
+                Ok(_) => results.push(Ok(ef.name.clone())),
+                Err(e) => results.push(Err(format!(
+                    "Error loading embedded function '{}': {}",
+                    ef.name, e
+                ))),
+            },
             Err((line, err)) => {
-                results.push(Err(format!("Error parsing embedded function '{}' at line {}: {}", ef.name, line, err)));
+                results.push(Err(format!(
+                    "Error parsing embedded function '{}' at line {}: {}",
+                    ef.name, line, err
+                )));
             }
         }
     }

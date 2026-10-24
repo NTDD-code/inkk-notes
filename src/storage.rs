@@ -1,9 +1,9 @@
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::Path;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::Path;
 
 use crate::model::Notebook;
 
@@ -19,7 +19,9 @@ impl NotebookStorage {
         encoder
             .write_all(json_data.as_bytes())
             .map_err(|e| format!("Failed to compress data: {}", e))?;
-        encoder.finish().map_err(|e| format!("Failed to finish compression: {}", e))?;
+        encoder
+            .finish()
+            .map_err(|e| format!("Failed to finish compression: {}", e))?;
 
         Ok(())
     }
@@ -31,8 +33,8 @@ impl NotebookStorage {
 
         if decoder.read_to_string(&mut contents).is_ok() {
             let clean = contents.trim_start_matches('\u{feff}');
-            let notebook: Notebook = serde_json::from_str(clean)
-                .map_err(|e| format!("Invalid notebook JSON: {}", e))?;
+            let notebook: Notebook =
+                serde_json::from_str(clean).map_err(|e| format!("Invalid notebook JSON: {}", e))?;
             return Ok(notebook);
         }
 
@@ -40,7 +42,9 @@ impl NotebookStorage {
         let raw_file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
         let mut raw_reader = std::io::BufReader::new(raw_file);
         let mut raw_contents = String::new();
-        raw_reader.read_to_string(&mut raw_contents).map_err(|e| format!("Read failed: {}", e))?;
+        raw_reader
+            .read_to_string(&mut raw_contents)
+            .map_err(|e| format!("Read failed: {}", e))?;
         let clean_raw = raw_contents.trim_start_matches('\u{feff}');
         let notebook: Notebook = serde_json::from_str(clean_raw)
             .map_err(|e| format!("Invalid notebook format: {}", e))?;

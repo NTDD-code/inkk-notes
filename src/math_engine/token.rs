@@ -17,20 +17,20 @@ pub enum TokenKind {
     DotStar,
     DotSlash,
     DotCaret,
-    Transpose,     // '
-    DotTranspose,  // .'
-    Colon,         // :
-    Equal,         // =
-    EqualEqual,    // ==
-    NotEqual,      // ~=
-    Less,          // <
-    LessEqual,     // <=
-    Greater,       // >
-    GreaterEqual,  // >=
-    And,           // &
-    Or,            // |
-    Tilde,         // ~
-    At,            // @
+    Transpose,    // '
+    DotTranspose, // .'
+    Colon,        // :
+    Equal,        // =
+    EqualEqual,   // ==
+    NotEqual,     // ~=
+    Less,         // <
+    LessEqual,    // <=
+    Greater,      // >
+    GreaterEqual, // >=
+    And,          // &
+    Or,           // |
+    Tilde,        // ~
+    At,           // @
 
     // Keywords
     For,
@@ -45,14 +45,14 @@ pub enum TokenKind {
     Return,
 
     // Delimiters
-    LParen,        // (
-    RParen,        // )
-    LBracket,      // [
-    RBracket,      // ]
-    Semicolon,     // ;
-    Comma,         // ,
-    Newline,       // \n
-    SpaceSep,      // whitespace acting as element separator inside [ ]
+    LParen,    // (
+    RParen,    // )
+    LBracket,  // [
+    RBracket,  // ]
+    Semicolon, // ;
+    Comma,     // ,
+    Newline,   // \n
+    SpaceSep,  // whitespace acting as element separator inside [ ]
 
     // End of input
     Eof,
@@ -153,7 +153,8 @@ impl<'a> Lexer<'a> {
                     c_text.push(c);
                     self.advance();
                 }
-                self.comments.insert(comment_line, c_text.trim().to_string());
+                self.comments
+                    .insert(comment_line, c_text.trim().to_string());
                 continue;
             }
 
@@ -162,7 +163,7 @@ impl<'a> Lexer<'a> {
                 self.advance(); // .
                 self.advance(); // .
                 self.advance(); // .
-                // Skip everything until newline, and consume the newline
+                                // Skip everything until newline, and consume the newline
                 while let Some(c) = self.peek() {
                     self.advance();
                     if c == '\n' {
@@ -206,7 +207,10 @@ impl<'a> Lexer<'a> {
                             '+' | '-' => {
                                 // Rule: whitespace + sign (+/-) + NO whitespace after -> is new element
                                 if let Some(after_sign) = self.peek_next() {
-                                    after_sign != ' ' && after_sign != '\t' && after_sign != '\r' && after_sign != '\n'
+                                    after_sign != ' '
+                                        && after_sign != '\t'
+                                        && after_sign != '\r'
+                                        && after_sign != '\n'
                                 } else {
                                     false
                                 }
@@ -246,25 +250,41 @@ impl<'a> Lexer<'a> {
                     if next_c == '*' {
                         self.advance();
                         self.advance();
-                        tokens.push(Token { kind: TokenKind::DotStar, line: start_line, col: start_col });
+                        tokens.push(Token {
+                            kind: TokenKind::DotStar,
+                            line: start_line,
+                            col: start_col,
+                        });
                         self.last_token_can_be_transposed = false;
                         continue;
                     } else if next_c == '/' {
                         self.advance();
                         self.advance();
-                        tokens.push(Token { kind: TokenKind::DotSlash, line: start_line, col: start_col });
+                        tokens.push(Token {
+                            kind: TokenKind::DotSlash,
+                            line: start_line,
+                            col: start_col,
+                        });
                         self.last_token_can_be_transposed = false;
                         continue;
                     } else if next_c == '^' {
                         self.advance();
                         self.advance();
-                        tokens.push(Token { kind: TokenKind::DotCaret, line: start_line, col: start_col });
+                        tokens.push(Token {
+                            kind: TokenKind::DotCaret,
+                            line: start_line,
+                            col: start_col,
+                        });
                         self.last_token_can_be_transposed = false;
                         continue;
                     } else if next_c == '\'' && self.last_token_can_be_transposed {
                         self.advance();
                         self.advance();
-                        tokens.push(Token { kind: TokenKind::DotTranspose, line: start_line, col: start_col });
+                        tokens.push(Token {
+                            kind: TokenKind::DotTranspose,
+                            line: start_line,
+                            col: start_col,
+                        });
                         self.last_token_can_be_transposed = true;
                         continue;
                     }
@@ -275,7 +295,11 @@ impl<'a> Lexer<'a> {
             if ch == '\'' {
                 if self.last_token_can_be_transposed {
                     self.advance();
-                    tokens.push(Token { kind: TokenKind::Transpose, line: start_line, col: start_col });
+                    tokens.push(Token {
+                        kind: TokenKind::Transpose,
+                        line: start_line,
+                        col: start_col,
+                    });
                     self.last_token_can_be_transposed = true;
                     continue;
                 } else {
@@ -303,7 +327,11 @@ impl<'a> Lexer<'a> {
                             self.advance();
                         }
                     }
-                    tokens.push(Token { kind: TokenKind::Str(s), line: start_line, col: start_col });
+                    tokens.push(Token {
+                        kind: TokenKind::Str(s),
+                        line: start_line,
+                        col: start_col,
+                    });
                     self.last_token_can_be_transposed = true;
                     continue;
                 }
@@ -328,13 +356,19 @@ impl<'a> Lexer<'a> {
                         self.advance();
                     }
                 }
-                tokens.push(Token { kind: TokenKind::Str(s), line: start_line, col: start_col });
+                tokens.push(Token {
+                    kind: TokenKind::Str(s),
+                    line: start_line,
+                    col: start_col,
+                });
                 self.last_token_can_be_transposed = true;
                 continue;
             }
 
             // 8. Numbers (integer, float, scientific notation)
-            if ch.is_ascii_digit() || (ch == '.' && self.peek_next().map_or(false, |c| c.is_ascii_digit())) {
+            if ch.is_ascii_digit()
+                || (ch == '.' && self.peek_next().map_or(false, |c| c.is_ascii_digit()))
+            {
                 let mut num_str = String::new();
                 let mut has_dot = false;
                 let mut has_exp = false;

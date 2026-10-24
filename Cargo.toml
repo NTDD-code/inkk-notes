@@ -11,4 +11,8 @@ serde_json = "1.0"
 flate2 = "1.0"
 rfd = "0.15"
 arboard = "3.4"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+image = { version = "0.25", features = ["default-formats"] }
+resvg = "0.44"
+tiny-skia = "0.11"
+pdf-writer = "0.15"
+thiserror = "1.0"

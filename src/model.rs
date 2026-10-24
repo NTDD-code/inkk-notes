@@ -20,14 +20,24 @@ impl<'de> Deserialize<'de> for Point {
                 let y = map.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                 let pressure = map.get("pressure").and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
                 let thickness = map.get("thickness").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                Ok(Point { x, y, pressure, thickness })
+                Ok(Point {
+                    x,
+                    y,
+                    pressure,
+                    thickness,
+                })
             }
             serde_json::Value::Array(arr) => {
                 let x = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                 let y = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                 let pressure = arr.get(2).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
                 let thickness = arr.get(3).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                Ok(Point { x, y, pressure, thickness })
+                Ok(Point {
+                    x,
+                    y,
+                    pressure,
+                    thickness,
+                })
             }
             _ => Ok(Point::new(0.0, 0.0, 1.0)),
         }
@@ -114,6 +124,35 @@ pub enum ShapeType {
     Pentagon,
     Hexagon,
     Star,
+    GraphQuadrant1,
+    Graph2D,
+    Graph3D,
+    Cube3D,
+    Pyramid3D,
+    Sphere3D,
+}
+
+impl ShapeType {
+    pub fn vector_icon(&self) -> crate::vector_icon::VectorIcon {
+        match self {
+            ShapeType::Line => crate::vector_icon::VectorIcon::ShapeLine,
+            ShapeType::Arrow => crate::vector_icon::VectorIcon::ShapeArrow,
+            ShapeType::DoubleArrow => crate::vector_icon::VectorIcon::ShapeDoubleArrow,
+            ShapeType::Rectangle => crate::vector_icon::VectorIcon::ShapeRectangle,
+            ShapeType::Circle => crate::vector_icon::VectorIcon::ShapeCircle,
+            ShapeType::Triangle => crate::vector_icon::VectorIcon::ShapeTriangle,
+            ShapeType::Pentagon => crate::vector_icon::VectorIcon::ShapePentagon,
+            ShapeType::Hexagon => crate::vector_icon::VectorIcon::ShapeHexagon,
+            ShapeType::Star => crate::vector_icon::VectorIcon::ShapeStar,
+            ShapeType::GraphQuadrant1 => crate::vector_icon::VectorIcon::GraphQuadrant1,
+            ShapeType::Graph2D => crate::vector_icon::VectorIcon::Graph2D,
+            ShapeType::Graph3D => crate::vector_icon::VectorIcon::Graph3D,
+            ShapeType::Cube3D => crate::vector_icon::VectorIcon::ShapeCube3D,
+            ShapeType::Pyramid3D => crate::vector_icon::VectorIcon::ShapePyramid3D,
+            ShapeType::Sphere3D => crate::vector_icon::VectorIcon::ShapeSphere3D,
+            ShapeType::None => crate::vector_icon::VectorIcon::ShapeRectangle,
+        }
+    }
 }
 
 pub fn deserialize_shape_type<'de, D>(deserializer: D) -> Result<ShapeType, D::Error>
@@ -132,6 +171,12 @@ where
             Some(7) => Ok(ShapeType::Pentagon),
             Some(8) => Ok(ShapeType::Hexagon),
             Some(9) => Ok(ShapeType::Star),
+            Some(10) => Ok(ShapeType::GraphQuadrant1),
+            Some(11) => Ok(ShapeType::Graph2D),
+            Some(12) => Ok(ShapeType::Graph3D),
+            Some(13) => Ok(ShapeType::Cube3D),
+            Some(14) => Ok(ShapeType::Pyramid3D),
+            Some(15) => Ok(ShapeType::Sphere3D),
             _ => Ok(ShapeType::None),
         },
         serde_json::Value::String(s) => {
@@ -146,6 +191,14 @@ where
                 "pentagon" => Ok(ShapeType::Pentagon),
                 "hexagon" => Ok(ShapeType::Hexagon),
                 "star" => Ok(ShapeType::Star),
+                "graphquadrant1" | "quadrant1" | "axes1d" | "graph1d" => {
+                    Ok(ShapeType::GraphQuadrant1)
+                }
+                "graph2d" | "axes2d" | "fourquadrants" => Ok(ShapeType::Graph2D),
+                "graph3d" | "axes3d" | "threedimensional" => Ok(ShapeType::Graph3D),
+                "cube" | "cube3d" | "box3d" => Ok(ShapeType::Cube3D),
+                "pyramid" | "pyramid3d" | "tetrahedron" => Ok(ShapeType::Pyramid3D),
+                "sphere" | "sphere3d" | "globe" => Ok(ShapeType::Sphere3D),
                 _ => Ok(ShapeType::None),
             }
         }
@@ -319,7 +372,13 @@ fn parse_hex_color(s: &str) -> [u8; 4] {
 }
 
 fn default_stroke_id() -> String {
-    format!("stroke_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+    format!(
+        "stroke_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
 }
 
 fn default_pen_type() -> PenType {
@@ -355,7 +414,13 @@ fn default_page_height() -> f32 {
 }
 
 fn default_page_id() -> String {
-    format!("page_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis())
+    format!(
+        "page_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    )
 }
 
 fn default_notebook_title() -> String {
@@ -370,9 +435,15 @@ fn default_pages() -> Vec<Page> {
 pub struct Stroke {
     #[serde(default = "default_stroke_id")]
     pub id: String,
-    #[serde(default = "default_pen_type", deserialize_with = "deserialize_pen_type")]
+    #[serde(
+        default = "default_pen_type",
+        deserialize_with = "deserialize_pen_type"
+    )]
     pub pen_type: PenType,
-    #[serde(default = "default_shape_type", deserialize_with = "deserialize_shape_type")]
+    #[serde(
+        default = "default_shape_type",
+        deserialize_with = "deserialize_shape_type"
+    )]
     pub shape_type: ShapeType,
     #[serde(default)]
     pub is_filled: bool,
@@ -400,17 +471,31 @@ impl Stroke {
         let mut max_y = self.points[0].y;
 
         for p in &self.points[1..] {
-            if p.x < min_x { min_x = p.x; }
-            if p.x > max_x { max_x = p.x; }
-            if p.y < min_y { min_y = p.y; }
-            if p.y > max_y { max_y = p.y; }
+            if p.x < min_x {
+                min_x = p.x;
+            }
+            if p.x > max_x {
+                max_x = p.x;
+            }
+            if p.y < min_y {
+                min_y = p.y;
+            }
+            if p.y > max_y {
+                max_y = p.y;
+            }
         }
         Some((min_x, min_y, max_x, max_y))
     }
 }
 
 fn default_text_box_id() -> String {
-    format!("text_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+    format!(
+        "text_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
 }
 
 fn default_text_box_width() -> f32 {
@@ -472,7 +557,13 @@ impl TextBox {
 }
 
 fn default_image_id() -> String {
-    format!("img_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+    format!(
+        "img_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -502,7 +593,7 @@ impl ImageEntity {
         }
     }
 
-#[allow(dead_code)]
+    #[allow(dead_code)]
     pub fn bounds(&self) -> (f32, f32, f32, f32) {
         (self.x, self.y, self.x + self.width, self.y + self.height)
     }
@@ -513,7 +604,13 @@ fn default_true() -> bool {
 }
 
 fn default_plot_id() -> String {
-    format!("plot_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+    format!(
+        "plot_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -543,10 +640,30 @@ pub struct PlotEntity {
     pub show_axes: bool,
     #[serde(default)]
     pub title: String,
+    #[serde(default)]
+    pub dimension: Option<String>,
+    #[serde(default)]
+    pub x_step: Option<f64>,
+    #[serde(default)]
+    pub y_step: Option<f64>,
+    #[serde(default)]
+    pub z_min: Option<f64>,
+    #[serde(default)]
+    pub z_max: Option<f64>,
+    #[serde(default)]
+    pub z_step: Option<f64>,
+    #[serde(default)]
+    pub source_code: Option<String>,
 }
 
 fn default_matrix_id() -> String {
-    format!("mat_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+    format!(
+        "mat_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -560,10 +677,18 @@ pub struct MatrixEntity {
     #[serde(default)]
     pub label: String,
     pub data: Vec<Vec<f64>>,
+    #[serde(default)]
+    pub source_code: Option<String>,
 }
 
 fn default_grid_id() -> String {
-    format!("grid_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos())
+    format!(
+        "grid_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -578,6 +703,66 @@ pub struct TableGridEntity {
     pub row_height: f32,
     #[serde(default)]
     pub cells: Vec<Vec<String>>,
+    #[serde(default)]
+    pub source_code: Option<String>,
+}
+
+impl Default for PlotEntity {
+    fn default() -> Self {
+        Self {
+            id: default_plot_id(),
+            x: 50.0,
+            y: 50.0,
+            width: 450.0,
+            height: 320.0,
+            x_min: -5.0,
+            x_max: 5.0,
+            y_min: -5.0,
+            y_max: 5.0,
+            curves: Vec::new(),
+            show_grid: true,
+            show_axes: true,
+            title: String::new(),
+            dimension: None,
+            x_step: None,
+            y_step: None,
+            z_min: None,
+            z_max: None,
+            z_step: None,
+            source_code: None,
+        }
+    }
+}
+
+impl Default for MatrixEntity {
+    fn default() -> Self {
+        Self {
+            id: default_matrix_id(),
+            x: 60.0,
+            y: 60.0,
+            width: 220.0,
+            height: 140.0,
+            label: String::new(),
+            data: Vec::new(),
+            source_code: None,
+        }
+    }
+}
+
+impl Default for TableGridEntity {
+    fn default() -> Self {
+        Self {
+            id: default_grid_id(),
+            x: 60.0,
+            y: 60.0,
+            rows: 3,
+            cols: 3,
+            col_width: 100.0,
+            row_height: 36.0,
+            cells: Vec::new(),
+            source_code: None,
+        }
+    }
 }
 
 impl TableGridEntity {
@@ -590,11 +775,54 @@ impl TableGridEntity {
     }
 }
 
+fn default_flowchart_id() -> String {
+    format!(
+        "flow_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowchartEntity {
+    #[serde(default = "default_flowchart_id")]
+    pub id: String,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub dsl_source: String,
+    #[serde(default)]
+    pub graph: Option<crate::flowchart_core::ir::FlowchartGraph>,
+    #[serde(default)]
+    pub title: String,
+}
+
+impl Default for FlowchartEntity {
+    fn default() -> Self {
+        Self {
+            id: default_flowchart_id(),
+            x: 60.0,
+            y: 60.0,
+            width: 400.0,
+            height: 300.0,
+            dsl_source: String::new(),
+            graph: None,
+            title: String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Page {
     #[serde(default = "default_page_id")]
     pub id: String,
-    #[serde(default = "default_paper_type", deserialize_with = "deserialize_paper_type")]
+    #[serde(
+        default = "default_paper_type",
+        deserialize_with = "deserialize_paper_type"
+    )]
     pub paper_type: PaperType,
     #[serde(default = "default_page_width")]
     pub width: f32,
@@ -612,12 +840,20 @@ pub struct Page {
     pub matrices: Vec<MatrixEntity>,
     #[serde(default)]
     pub grids: Vec<TableGridEntity>,
+    #[serde(default)]
+    pub flowcharts: Vec<FlowchartEntity>,
 }
 
 impl Page {
     pub fn new(paper_type: PaperType) -> Self {
         Self {
-            id: format!("page_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()),
+            id: format!(
+                "page_{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis()
+            ),
             paper_type,
             width: 1000.0,
             height: 1400.0,
@@ -627,6 +863,7 @@ impl Page {
             plots: Vec::new(),
             matrices: Vec::new(),
             grids: Vec::new(),
+            flowcharts: Vec::new(),
         }
     }
 
@@ -648,7 +885,10 @@ impl Page {
 pub struct Notebook {
     #[serde(default = "default_notebook_title")]
     pub title: String,
-    #[serde(default = "default_paper_type", deserialize_with = "deserialize_paper_type")]
+    #[serde(
+        default = "default_paper_type",
+        deserialize_with = "deserialize_paper_type"
+    )]
     pub default_paper: PaperType,
     #[serde(default = "default_pages")]
     pub pages: Vec<Page>,
@@ -668,6 +908,24 @@ impl Default for Notebook {
 }
 
 impl Notebook {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            default_paper: PaperType::Ruled,
+            pages: vec![Page::new(PaperType::Ruled)],
+            current_page_index: 0,
+        }
+    }
+
+    pub fn new_with_paper(title: &str, paper: PaperType) -> Self {
+        Self {
+            title: title.to_string(),
+            default_paper: paper,
+            pages: vec![Page::new(paper)],
+            current_page_index: 0,
+        }
+    }
+
     pub fn current_page(&self) -> &Page {
         &self.pages[self.current_page_index]
     }
@@ -678,13 +936,20 @@ impl Notebook {
 
     pub fn add_page(&mut self) {
         let paper = self.current_page().paper_type;
-        self.pages.insert(self.current_page_index + 1, Page::new(paper));
+        self.pages
+            .insert(self.current_page_index + 1, Page::new(paper));
         self.current_page_index += 1;
     }
 
     pub fn duplicate_current_page(&mut self) {
         let mut clone = self.current_page().clone();
-        clone.id = format!("page_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+        clone.id = format!(
+            "page_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        );
         self.pages.insert(self.current_page_index + 1, clone);
         self.current_page_index += 1;
     }
@@ -803,7 +1068,11 @@ mod tests {
         let p1 = Path::new(r"C:\Users\Lenovo\Downloads\Quick Scratchpad.handnote");
         if p1.exists() {
             let res = crate::storage::NotebookStorage::load(p1);
-            assert!(res.is_ok(), "Failed to load Quick Scratchpad: {:?}", res.err());
+            assert!(
+                res.is_ok(),
+                "Failed to load Quick Scratchpad: {:?}",
+                res.err()
+            );
         }
         let p2 = Path::new(r"C:\Users\Lenovo\Downloads\My Notebook 1.handnote");
         if p2.exists() {
@@ -838,7 +1107,13 @@ mod tests {
             opacity: 1.0,
             points: vec![Point::new(10.0, 20.0, 0.5), Point::new(30.0, 40.0, 0.6)],
         });
-        page.images.push(ImageEntity::new(100.0, 150.0, 400.0, 300.0, vec![10, 20, 30]));
+        page.images.push(ImageEntity::new(
+            100.0,
+            150.0,
+            400.0,
+            300.0,
+            vec![10, 20, 30],
+        ));
 
         let mut nb = Notebook::default();
         nb.pages = vec![page];
@@ -872,6 +1147,13 @@ mod tests {
             show_grid: true,
             show_axes: true,
             title: "Trigonometric Plot".into(),
+            dimension: None,
+            x_step: None,
+            y_step: None,
+            z_min: None,
+            z_max: None,
+            z_step: None,
+            source_code: None,
         });
         page.matrices.push(MatrixEntity {
             id: "m1".into(),
@@ -881,6 +1163,7 @@ mod tests {
             height: 120.0,
             label: "A =".into(),
             data: vec![vec![1.0, 2.0], vec![3.0, 4.0]],
+            source_code: None,
         });
         page.grids.push(TableGridEntity {
             id: "g1".into(),
@@ -891,6 +1174,17 @@ mod tests {
             col_width: 100.0,
             row_height: 35.0,
             cells: vec![vec!["Cell".into(); 4]; 3],
+            source_code: None,
+        });
+        page.flowcharts.push(FlowchartEntity {
+            id: "flow1".into(),
+            x: 80.0,
+            y: 80.0,
+            width: 450.0,
+            height: 350.0,
+            dsl_source: "start\nprint \"Hello Flowchart\"\nend".into(),
+            graph: None,
+            title: "Test Flowchart".into(),
         });
 
         let serialized = serde_json::to_string(&page).unwrap();
@@ -898,9 +1192,13 @@ mod tests {
         assert_eq!(deserialized.plots.len(), 1);
         assert_eq!(deserialized.matrices.len(), 1);
         assert_eq!(deserialized.grids.len(), 1);
+        assert_eq!(deserialized.flowcharts.len(), 1);
         assert_eq!(deserialized.plots[0].curves[0].label, "sin(x)");
         assert_eq!(deserialized.matrices[0].data[1][0], 3.0);
         assert_eq!(deserialized.grids[0].rows, 3);
+        assert_eq!(deserialized.flowcharts[0].title, "Test Flowchart");
+        assert!(deserialized.flowcharts[0]
+            .dsl_source
+            .contains("Hello Flowchart"));
     }
 }
-

@@ -1,16 +1,18 @@
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use std::collections::{HashMap, HashSet};
 
+use crate::math_renderer::MathRenderer;
 use crate::model::{
-    ImageEntity, Notebook, PaperType, PenType, Point, ShapeType, Stroke as NoteStroke, TextBox, ToolMode,
+    ImageEntity, Notebook, PaperType, PenType, Point, ShapeType, Stroke as NoteStroke, TextBox,
+    ToolMode,
 };
 use crate::renderer::NoteRenderer;
 use crate::ruler::{RulerKind, RulerState};
-use crate::math_renderer::MathRenderer;
 use crate::storage::NotebookStorage;
 use crate::stroke_algorithm::StabilizerPipeline;
 use crate::theme::{self, Palette};
 use crate::ui_math_studio::MathStudioState;
+use crate::vector_icon::VectorIcon;
 use crate::widgets;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -47,16 +49,22 @@ fn hit_handle(cursor: Pos2, r: Rect, radius: f32) -> Option<SelectionHandle> {
     None
 }
 
-const SHAPES: [(ShapeType, &str, &str); 9] = [
-    (ShapeType::Line, "↗", "Line"),
-    (ShapeType::Arrow, "➡", "Arrow"),
-    (ShapeType::DoubleArrow, "↔", "Double arrow"),
-    (ShapeType::Rectangle, "☐", "Rectangle"),
-    (ShapeType::Circle, "○", "Circle"),
-    (ShapeType::Triangle, "⏶", "Triangle"),
-    (ShapeType::Pentagon, "⬟", "Pentagon"),
-    (ShapeType::Hexagon, "⬣", "Hexagon"),
-    (ShapeType::Star, "☆", "Star"),
+const SHAPES: [(ShapeType, VectorIcon, &str); 15] = [
+    (ShapeType::Line, VectorIcon::ShapeLine, "Line"),
+    (ShapeType::Arrow, VectorIcon::ShapeArrow, "Arrow"),
+    (ShapeType::DoubleArrow, VectorIcon::ShapeDoubleArrow, "Double arrow"),
+    (ShapeType::Rectangle, VectorIcon::ShapeRectangle, "Rectangle"),
+    (ShapeType::Circle, VectorIcon::ShapeCircle, "Circle"),
+    (ShapeType::Triangle, VectorIcon::ShapeTriangle, "Triangle"),
+    (ShapeType::Pentagon, VectorIcon::ShapePentagon, "Pentagon"),
+    (ShapeType::Hexagon, VectorIcon::ShapeHexagon, "Hexagon"),
+    (ShapeType::Star, VectorIcon::ShapeStar, "Star"),
+    (ShapeType::GraphQuadrant1, VectorIcon::GraphQuadrant1, "1st Quadrant Axes (L-shape)"),
+    (ShapeType::Graph2D, VectorIcon::Graph2D, "2D Cartesian Axes (4 Quadrants)"),
+    (ShapeType::Graph3D, VectorIcon::Graph3D, "3D Coordinate Axes (X, Y, Z)"),
+    (ShapeType::Cube3D, VectorIcon::ShapeCube3D, "3D Cube (with hidden edges)"),
+    (ShapeType::Pyramid3D, VectorIcon::ShapePyramid3D, "3D Pyramid (with hidden edges)"),
+    (ShapeType::Sphere3D, VectorIcon::ShapeSphere3D, "3D Sphere (with latitude/longitude)"),
 ];
 
 const PAPERS: [PaperType; 5] = [
@@ -74,7 +82,10 @@ fn stroke_hit_test(stroke: &NoteStroke, world_pos: Pos2, radius: f32) -> bool {
     // For shapes: test against the geometric outline, not just 2 corner points
     if stroke.shape_type != ShapeType::None && stroke.points.len() >= 2 {
         let p1 = Pos2::new(stroke.points[0].x, stroke.points[0].y);
-        let p2 = Pos2::new(stroke.points.last().unwrap().x, stroke.points.last().unwrap().y);
+        let p2 = Pos2::new(
+            stroke.points.last().unwrap().x,
+            stroke.points.last().unwrap().y,
+        );
         let rect = Rect::from_two_pos(p1, p2);
 
         match stroke.shape_type {
@@ -172,6 +183,64 @@ fn point_in_polygon(p: Pos2, poly: &[Pos2]) -> bool {
     inside
 }
 
+#[cfg(target_os = "windows")]
+fn get_clipboard_files_windows() -> Vec<std::path::PathBuf> {
+    #[link(name = "user32")]
+    extern "system" {
+        fn OpenClipboard(hWndNewOwner: *mut std::ffi::c_void) -> i32;
+        fn CloseClipboard() -> i32;
+        fn GetClipboardData(uFormat: u32) -> *mut std::ffi::c_void;
+        fn IsClipboardFormatAvailable(uFormat: u32) -> i32;
+    }
+
+    #[link(name = "shell32")]
+    extern "system" {
+        fn DragQueryFileW(
+            hDrop: *mut std::ffi::c_void,
+            iFile: u32,
+            lpszFile: *mut u16,
+            cch: u32,
+        ) -> u32;
+    }
+
+    const CF_HDROP: u32 = 15;
+    let mut paths = Vec::new();
+
+    unsafe {
+        if IsClipboardFormatAvailable(CF_HDROP) == 0 {
+            return paths;
+        }
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return paths;
+        }
+        let hdrop = GetClipboardData(CF_HDROP);
+        if !hdrop.is_null() {
+            let count = DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0);
+            for i in 0..count {
+                let len = DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0);
+                if len > 0 {
+                    let mut buf: Vec<u16> = vec![0; (len + 1) as usize];
+                    DragQueryFileW(hdrop, i, buf.as_mut_ptr(), len + 1);
+                    if let Some(null_pos) = buf.iter().position(|&c| c == 0) {
+                        buf.truncate(null_pos);
+                    }
+                    use std::os::windows::ffi::OsStringExt;
+                    let os_str = std::ffi::OsString::from_wide(&buf);
+                    paths.push(std::path::PathBuf::from(os_str));
+                }
+            }
+        }
+        CloseClipboard();
+    }
+
+    paths
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_clipboard_files_windows() -> Vec<std::path::PathBuf> {
+    Vec::new()
+}
+
 pub struct InkkApp {
     notebook: Notebook,
     current_stroke: Option<NoteStroke>,
@@ -185,6 +254,7 @@ pub struct InkkApp {
     color: Color32,
     size: f32,
     opacity: f32,
+    custom_swatches: Vec<Color32>,
 
     // C++ One-Euro Stabilizer Pipeline & Timestamp Tracker
     stabilizer: StabilizerPipeline,
@@ -203,6 +273,7 @@ pub struct InkkApp {
     selected_plot_ids: HashSet<String>,
     selected_matrix_ids: HashSet<String>,
     selected_grid_ids: HashSet<String>,
+    selected_flowchart_ids: HashSet<String>,
     lasso_points: Vec<Pos2>,
     is_dragging_selection: bool,
     drag_last_pos_world: Pos2,
@@ -213,12 +284,49 @@ pub struct InkkApp {
     initial_plot_rects: Vec<(String, f32, f32, f32, f32)>,
     initial_matrix_rects: Vec<(String, f32, f32, f32, f32)>,
     initial_grid_rects: Vec<(String, f32, f32, f32, f32)>,
+    initial_flowchart_rects: Vec<(String, f32, f32, f32, f32)>,
 
     // Image textures cache
     image_textures: HashMap<String, egui::TextureHandle>,
 
     // MathStudio MATLAB-style IDE & Engine
     pub math_studio: MathStudioState,
+    pub matrix_dialog: crate::ui_dialogs::MatrixDialogState,
+    pub axes_dialog: crate::ui_dialogs::AxesDialogState,
+    pub table_dialog: crate::ui_dialogs::TableDialogState,
+
+    // Flowchart Studio & Engine
+    pub flowchart_editor: crate::flowchart_ui::FlowchartEditorState,
+
+
+    // Splash screen & Photoshop-style startup cover (bia.png)
+    pub splash_screen: crate::splash_screen::SplashScreenState,
+
+    // Keyboard Shortcuts manager & interactive dialog
+    pub shortcut_manager: crate::shortcuts::ShortcutManager,
+    pub shortcuts_dialog: crate::shortcuts::ShortcutsDialogState,
+
+    // Step-by-step interactive onboarding tour
+    pub onboarding_tour: crate::onboarding_tour::OnboardingTourState,
+
+    // Fullscreen view state
+    pub is_fullscreen: bool,
+
+    // Auto-Updater for market release updates
+    pub updater: crate::updater::UpdaterState,
+
+    // Notebook Library & Bookshelf Manager
+    pub library: crate::library::LibraryState,
+
+    // Autosave & Crash Recovery System
+    pub autosave: crate::autosave::AutosaveManager,
+    last_total_strokes: usize,
+
+    // PDF Export modal state & quality presets (Low, Medium, High)
+    pub show_pdf_export_dialog: bool,
+    pub pdf_export_quality: crate::pdf_export::PdfQualityPreset,
+    pub pdf_include_patterns: bool,
+    pub pdf_force_light: bool,
 
     // UI & Theme state
     is_dark_mode: bool,
@@ -245,6 +353,10 @@ pub struct InkkApp {
     resizing_text_id: Option<String>,
     resize_start_pointer: Pos2,
     resize_start_w: f32,
+
+    // Mouse auxiliary state
+    secondary_drag_start: Option<Pos2>,
+    secondary_drag_is_item: bool,
 }
 
 impl Default for InkkApp {
@@ -261,6 +373,14 @@ impl Default for InkkApp {
             color: theme::DEFAULT_INK_LIGHT,
             size: 3.0,
             opacity: 1.0,
+            custom_swatches: vec![
+                Color32::from_rgb(163, 35, 141), // Plum Orchid (#A3238D)
+                Color32::from_rgb(43, 108, 176), // Deep Azure
+                Color32::from_rgb(217, 119, 6),  // Warm Ochre
+                Color32::from_rgb(5, 150, 105),  // Emerald Green
+                Color32::from_rgb(124, 58, 237), // Royal Violet
+                Color32::from_rgb(220, 38, 38),  // Carmine Red
+            ],
 
             stabilizer: StabilizerPipeline::new(),
             app_start_time: std::time::Instant::now(),
@@ -276,6 +396,7 @@ impl Default for InkkApp {
             selected_plot_ids: HashSet::new(),
             selected_matrix_ids: HashSet::new(),
             selected_grid_ids: HashSet::new(),
+            selected_flowchart_ids: HashSet::new(),
             lasso_points: Vec::new(),
             is_dragging_selection: false,
             drag_last_pos_world: Pos2::ZERO,
@@ -286,8 +407,27 @@ impl Default for InkkApp {
             initial_plot_rects: Vec::new(),
             initial_matrix_rects: Vec::new(),
             initial_grid_rects: Vec::new(),
+            initial_flowchart_rects: Vec::new(),
             image_textures: HashMap::new(),
             math_studio: MathStudioState::default(),
+            matrix_dialog: crate::ui_dialogs::MatrixDialogState::default(),
+            axes_dialog: crate::ui_dialogs::AxesDialogState::default(),
+            table_dialog: crate::ui_dialogs::TableDialogState::default(),
+            flowchart_editor: crate::flowchart_ui::FlowchartEditorState::default(),
+            splash_screen: crate::splash_screen::SplashScreenState::default(),
+            shortcut_manager: crate::shortcuts::ShortcutManager::new(),
+            shortcuts_dialog: crate::shortcuts::ShortcutsDialogState::default(),
+            onboarding_tour: crate::onboarding_tour::OnboardingTourState::new(),
+            is_fullscreen: false,
+            updater: crate::updater::UpdaterState::new(),
+            library: crate::library::LibraryState::default(),
+            autosave: crate::autosave::AutosaveManager::new(),
+            last_total_strokes: 0,
+
+            show_pdf_export_dialog: false,
+            pdf_export_quality: crate::pdf_export::PdfQualityPreset::High,
+            pdf_include_patterns: true,
+            pdf_force_light: true,
 
             is_dark_mode: false,
             show_previews_drawer: false,
@@ -306,15 +446,47 @@ impl Default for InkkApp {
             resizing_text_id: None,
             resize_start_pointer: Pos2::ZERO,
             resize_start_w: 0.0,
+            secondary_drag_start: None,
+            secondary_drag_is_item: false,
         }
     }
 }
 
 impl InkkApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let app = Self::default();
+        let mut app = Self::default();
+
+        // Check for unfinalized crash recovery session
+        if let Some((recovered_nb, orig_path, meta)) = crate::autosave::AutosaveManager::check_recovery_available() {
+            let time_str = meta.time_str.clone();
+            let pages = meta.page_count;
+            let strokes = meta.stroke_count;
+            let title = meta.notebook_title.clone();
+            app.notebook = recovered_nb;
+            app.current_file_path = orig_path;
+            app.last_total_strokes = strokes;
+            app.autosave.recovery_restored_banner = Some(meta);
+            app.set_status(&format!(
+                "Restored uncommitted session '{}' ({} pages, {} strokes, saved at {}) 💾",
+                title, pages, strokes, time_str
+            ));
+        }
+
+        // Scan user documents & downloads for real notebooks immediately at startup
+        app.library.scan(None);
+
+        // Check for updates asynchronously in background on startup if configured
+        if app.updater.config.check_on_startup {
+            app.updater.check_for_updates(false);
+        }
+
         theme::apply(&cc.egui_ctx, app.is_dark_mode);
         app
+    }
+
+    #[allow(dead_code)]
+    pub fn mark_dirty(&mut self) {
+        self.autosave.mark_dirty();
     }
 
     fn palette(&self) -> Palette {
@@ -327,6 +499,7 @@ impl InkkApp {
         self.selected_plot_ids.clear();
         self.selected_matrix_ids.clear();
         self.selected_grid_ids.clear();
+        self.selected_flowchart_ids.clear();
         self.active_resize_handle = None;
         self.initial_selection_rect = None;
         self.initial_stroke_points.clear();
@@ -334,6 +507,7 @@ impl InkkApp {
         self.initial_plot_rects.clear();
         self.initial_matrix_rects.clear();
         self.initial_grid_rects.clear();
+        self.initial_flowchart_rects.clear();
     }
 
     fn set_tool(&mut self, mode: ToolMode) {
@@ -451,16 +625,43 @@ impl InkkApp {
 
     fn hit_test_clickable_card(&self, world: Pos2) -> Option<(&'static str, String)> {
         let page = self.notebook.current_page();
-        if let Some(p) = page.plots.iter().rev().find(|p| Rect::from_min_size(Pos2::new(p.x, p.y), Vec2::new(p.width, p.height)).contains(world)) {
+        let pad = 8.0 / self.scale;
+        if let Some(p) = page.plots.iter().rev().find(|p| {
+            Rect::from_min_size(Pos2::new(p.x, p.y), Vec2::new(p.width, p.height))
+                .expand(pad)
+                .contains(world)
+        }) {
             return Some(("plot", p.id.clone()));
         }
-        if let Some(m) = page.matrices.iter().rev().find(|m| Rect::from_min_size(Pos2::new(m.x, m.y), Vec2::new(m.width, m.height)).contains(world)) {
+        if let Some(m) = page.matrices.iter().rev().find(|m| {
+            Rect::from_min_size(Pos2::new(m.x, m.y), Vec2::new(m.width, m.height))
+                .expand(pad)
+                .contains(world)
+        }) {
             return Some(("matrix", m.id.clone()));
         }
-        if let Some(g) = page.grids.iter().rev().find(|g| Rect::from_min_size(Pos2::new(g.x, g.y), Vec2::new(g.total_width(), g.total_height())).contains(world)) {
+        if let Some(g) = page.grids.iter().rev().find(|g| {
+            Rect::from_min_size(
+                Pos2::new(g.x, g.y),
+                Vec2::new(g.total_width(), g.total_height()),
+            )
+            .expand(pad)
+            .contains(world)
+        }) {
             return Some(("grid", g.id.clone()));
         }
-        if let Some(i) = page.images.iter().rev().find(|i| Rect::from_min_size(Pos2::new(i.x, i.y), Vec2::new(i.width, i.height)).contains(world)) {
+        if let Some(f) = page.flowcharts.iter().rev().find(|f| {
+            Rect::from_min_size(Pos2::new(f.x, f.y), Vec2::new(f.width, f.height))
+                .expand(pad)
+                .contains(world)
+        }) {
+            return Some(("flowchart", f.id.clone()));
+        }
+        if let Some(i) = page.images.iter().rev().find(|i| {
+            Rect::from_min_size(Pos2::new(i.x, i.y), Vec2::new(i.width, i.height))
+                .expand(pad)
+                .contains(world)
+        }) {
             return Some(("image", i.id.clone()));
         }
         None
@@ -472,6 +673,7 @@ impl InkkApp {
             && self.selected_plot_ids.is_empty()
             && self.selected_matrix_ids.is_empty()
             && self.selected_grid_ids.is_empty()
+            && self.selected_flowchart_ids.is_empty()
         {
             return None;
         }
@@ -486,10 +688,18 @@ impl InkkApp {
             if self.selected_stroke_ids.contains(&stroke.id) {
                 for pt in &stroke.points {
                     found = true;
-                    if pt.x < min_x { min_x = pt.x; }
-                    if pt.x > max_x { max_x = pt.x; }
-                    if pt.y < min_y { min_y = pt.y; }
-                    if pt.y > max_y { max_y = pt.y; }
+                    if pt.x < min_x {
+                        min_x = pt.x;
+                    }
+                    if pt.x > max_x {
+                        max_x = pt.x;
+                    }
+                    if pt.y < min_y {
+                        min_y = pt.y;
+                    }
+                    if pt.y > max_y {
+                        max_y = pt.y;
+                    }
                 }
             }
         }
@@ -497,48 +707,100 @@ impl InkkApp {
         for img in &page.images {
             if self.selected_image_ids.contains(&img.id) {
                 found = true;
-                if img.x < min_x { min_x = img.x; }
-                if img.y < min_y { min_y = img.y; }
+                if img.x < min_x {
+                    min_x = img.x;
+                }
+                if img.y < min_y {
+                    min_y = img.y;
+                }
                 let right = img.x + img.width;
                 let bottom = img.y + img.height;
-                if right > max_x { max_x = right; }
-                if bottom > max_y { max_y = bottom; }
+                if right > max_x {
+                    max_x = right;
+                }
+                if bottom > max_y {
+                    max_y = bottom;
+                }
             }
         }
 
         for plot in &page.plots {
             if self.selected_plot_ids.contains(&plot.id) {
                 found = true;
-                if plot.x < min_x { min_x = plot.x; }
-                if plot.y < min_y { min_y = plot.y; }
+                if plot.x < min_x {
+                    min_x = plot.x;
+                }
+                if plot.y < min_y {
+                    min_y = plot.y;
+                }
                 let right = plot.x + plot.width;
                 let bottom = plot.y + plot.height;
-                if right > max_x { max_x = right; }
-                if bottom > max_y { max_y = bottom; }
+                if right > max_x {
+                    max_x = right;
+                }
+                if bottom > max_y {
+                    max_y = bottom;
+                }
             }
         }
 
         for matrix in &page.matrices {
             if self.selected_matrix_ids.contains(&matrix.id) {
                 found = true;
-                if matrix.x < min_x { min_x = matrix.x; }
-                if matrix.y < min_y { min_y = matrix.y; }
+                if matrix.x < min_x {
+                    min_x = matrix.x;
+                }
+                if matrix.y < min_y {
+                    min_y = matrix.y;
+                }
                 let right = matrix.x + matrix.width;
                 let bottom = matrix.y + matrix.height;
-                if right > max_x { max_x = right; }
-                if bottom > max_y { max_y = bottom; }
+                if right > max_x {
+                    max_x = right;
+                }
+                if bottom > max_y {
+                    max_y = bottom;
+                }
             }
         }
 
         for grid in &page.grids {
             if self.selected_grid_ids.contains(&grid.id) {
                 found = true;
-                if grid.x < min_x { min_x = grid.x; }
-                if grid.y < min_y { min_y = grid.y; }
+                if grid.x < min_x {
+                    min_x = grid.x;
+                }
+                if grid.y < min_y {
+                    min_y = grid.y;
+                }
                 let right = grid.x + grid.total_width();
                 let bottom = grid.y + grid.total_height();
-                if right > max_x { max_x = right; }
-                if bottom > max_y { max_y = bottom; }
+                if right > max_x {
+                    max_x = right;
+                }
+                if bottom > max_y {
+                    max_y = bottom;
+                }
+            }
+        }
+
+        for flow in &page.flowcharts {
+            if self.selected_flowchart_ids.contains(&flow.id) {
+                found = true;
+                if flow.x < min_x {
+                    min_x = flow.x;
+                }
+                if flow.y < min_y {
+                    min_y = flow.y;
+                }
+                let right = flow.x + flow.width;
+                let bottom = flow.y + flow.height;
+                if right > max_x {
+                    max_x = right;
+                }
+                if bottom > max_y {
+                    max_y = bottom;
+                }
             }
         }
 
@@ -547,7 +809,10 @@ impl InkkApp {
             let max_x = max_x.max(min_x + 2.0);
             let min_y = min_y.min(max_y);
             let max_y = max_y.max(min_y + 2.0);
-            Some(Rect::from_min_max(Pos2::new(min_x, min_y), Pos2::new(max_x, max_y)))
+            Some(Rect::from_min_max(
+                Pos2::new(min_x, min_y),
+                Pos2::new(max_x, max_y),
+            ))
         } else {
             None
         }
@@ -559,20 +824,36 @@ impl InkkApp {
             && self.selected_plot_ids.is_empty()
             && self.selected_matrix_ids.is_empty()
             && self.selected_grid_ids.is_empty()
+            && self.selected_flowchart_ids.is_empty()
         {
             return;
         }
         let stroke_count = self.selected_stroke_ids.len();
         let image_count = self.selected_image_ids.len();
-        let math_count = self.selected_plot_ids.len() + self.selected_matrix_ids.len() + self.selected_grid_ids.len();
+        let math_count = self.selected_plot_ids.len()
+            + self.selected_matrix_ids.len()
+            + self.selected_grid_ids.len();
+        let flow_count = self.selected_flowchart_ids.len();
         let page = self.notebook.current_page_mut();
-        page.strokes.retain(|s| !self.selected_stroke_ids.contains(&s.id));
-        page.images.retain(|i| !self.selected_image_ids.contains(&i.id));
-        page.plots.retain(|p| !self.selected_plot_ids.contains(&p.id));
-        page.matrices.retain(|m| !self.selected_matrix_ids.contains(&m.id));
-        page.grids.retain(|g| !self.selected_grid_ids.contains(&g.id));
+        page.strokes
+            .retain(|s| !self.selected_stroke_ids.contains(&s.id));
+        page.images
+            .retain(|i| !self.selected_image_ids.contains(&i.id));
+        page.plots
+            .retain(|p| !self.selected_plot_ids.contains(&p.id));
+        page.matrices
+            .retain(|m| !self.selected_matrix_ids.contains(&m.id));
+        page.grids
+            .retain(|g| !self.selected_grid_ids.contains(&g.id));
+        page.flowcharts
+            .retain(|f| !self.selected_flowchart_ids.contains(&f.id));
         self.clear_selection();
-        self.set_status(&format!("Deleted {} stroke(s), {} image(s), {} math item(s)", stroke_count, image_count, math_count));
+        self.set_status(&format!(
+            "Deleted {} stroke(s), {} image(s), {} math/flowchart item(s)",
+            stroke_count,
+            image_count,
+            math_count + flow_count
+        ));
     }
 
     fn prepare_selection_drag(&mut self) {
@@ -609,25 +890,203 @@ impl InkkApp {
                 .filter(|g| self.selected_grid_ids.contains(&g.id))
                 .map(|g| (g.id.clone(), g.x, g.y, g.total_width(), g.total_height()))
                 .collect();
+            self.initial_flowchart_rects = page
+                .flowcharts
+                .iter()
+                .filter(|f| self.selected_flowchart_ids.contains(&f.id))
+                .map(|f| (f.id.clone(), f.x, f.y, f.width, f.height))
+                .collect();
         }
+    }
+
+    fn apply_selection_delta(&mut self, delta: Vec2) {
+        let page = self.notebook.current_page_mut();
+        for stroke in &mut page.strokes {
+            if self.selected_stroke_ids.contains(&stroke.id) {
+                for pt in &mut stroke.points {
+                    pt.x += delta.x;
+                    pt.y += delta.y;
+                }
+            }
+        }
+        for img in &mut page.images {
+            if self.selected_image_ids.contains(&img.id) {
+                img.x += delta.x;
+                img.y += delta.y;
+            }
+        }
+        for plot in &mut page.plots {
+            if self.selected_plot_ids.contains(&plot.id) {
+                plot.x += delta.x;
+                plot.y += delta.y;
+            }
+        }
+        for matrix in &mut page.matrices {
+            if self.selected_matrix_ids.contains(&matrix.id) {
+                matrix.x += delta.x;
+                matrix.y += delta.y;
+            }
+        }
+        for grid in &mut page.grids {
+            if self.selected_grid_ids.contains(&grid.id) {
+                grid.x += delta.x;
+                grid.y += delta.y;
+            }
+        }
+        for flow in &mut page.flowcharts {
+            if self.selected_flowchart_ids.contains(&flow.id) {
+                flow.x += delta.x;
+                flow.y += delta.y;
+            }
+        }
+    }
+
+    fn finish_selection_drag(&mut self) {
+        self.is_dragging_selection = false;
+        self.active_resize_handle = None;
+        self.initial_selection_rect = None;
+        self.initial_stroke_points.clear();
+        self.initial_image_rects.clear();
+        self.initial_plot_rects.clear();
+        self.initial_matrix_rects.clear();
+        self.initial_grid_rects.clear();
+        self.initial_flowchart_rects.clear();
+
+        let page = self.notebook.current_page_mut();
+        let mut max_y = 0.0f32;
+        for stroke in &page.strokes {
+            if self.selected_stroke_ids.contains(&stroke.id) {
+                for pt in &stroke.points {
+                    if pt.y > max_y {
+                        max_y = pt.y;
+                    }
+                }
+            }
+        }
+        for img in &page.images {
+            if self.selected_image_ids.contains(&img.id) {
+                let bottom = img.y + img.height;
+                if bottom > max_y {
+                    max_y = bottom;
+                }
+            }
+        }
+        for plot in &page.plots {
+            if self.selected_plot_ids.contains(&plot.id) {
+                let bottom = plot.y + plot.height;
+                if bottom > max_y {
+                    max_y = bottom;
+                }
+            }
+        }
+        for m in &page.matrices {
+            if self.selected_matrix_ids.contains(&m.id) {
+                let bottom = m.y + m.height;
+                if bottom > max_y {
+                    max_y = bottom;
+                }
+            }
+        }
+        for g in &page.grids {
+            if self.selected_grid_ids.contains(&g.id) {
+                let bottom = g.y + g.total_height();
+                if bottom > max_y {
+                    max_y = bottom;
+                }
+            }
+        }
+        if page.check_auto_expand(max_y) {
+            self.set_status("Page auto-expanded! ♾️");
+        }
+    }
+
+    fn get_svg_font_db() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
+        static FONT_DB: std::sync::OnceLock<std::sync::Arc<resvg::usvg::fontdb::Database>> =
+            std::sync::OnceLock::new();
+        FONT_DB
+            .get_or_init(|| {
+                let mut db = resvg::usvg::fontdb::Database::new();
+                db.load_system_fonts();
+                std::sync::Arc::new(db)
+            })
+            .clone()
+    }
+
+    fn decode_svg_data(bytes: &[u8]) -> Option<(Vec<u8>, f32, f32)> {
+        let opt = resvg::usvg::Options {
+            fontdb: Self::get_svg_font_db(),
+            ..Default::default()
+        };
+        let tree = resvg::usvg::Tree::from_data(bytes, &opt).ok()?;
+        let size = tree.size();
+        let width = size.width();
+        let height = size.height();
+        if width <= 0.0 || height <= 0.0 {
+            return None;
+        }
+
+        let max_render_dim = 1200.0f32;
+        let scale = if width > max_render_dim || height > max_render_dim {
+            (max_render_dim / width).min(max_render_dim / height)
+        } else if width < 100.0 || height < 100.0 {
+            (400.0 / width).min(400.0 / height).max(1.0)
+        } else {
+            1.0
+        };
+
+        let render_w = ((width * scale).round() as u32).max(1);
+        let render_h = ((height * scale).round() as u32).max(1);
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(render_w, render_h)?;
+        let transform = resvg::tiny_skia::Transform::from_scale(
+            render_w as f32 / width,
+            render_h as f32 / height,
+        );
+        resvg::render(&tree, transform, &mut pixmap.as_mut());
+        let png_bytes = pixmap.encode_png().ok()?;
+        Some((png_bytes, width, height))
+    }
+
+    fn decode_image_or_svg(bytes: &[u8]) -> Option<(Vec<u8>, f32, f32)> {
+        // 1. Try standard raster image decoding with image crate (png, jpeg, webp, bmp, gif, etc.)
+        if let Ok(dyn_img) = image::load_from_memory(bytes) {
+            let w = dyn_img.width() as f32;
+            let h = dyn_img.height() as f32;
+            return Some((bytes.to_vec(), w, h));
+        }
+
+        // 2. Try SVG vector rendering via resvg
+        if let Some(res) = Self::decode_svg_data(bytes) {
+            return Some(res);
+        }
+
+        None
     }
 
     fn prompt_insert_image(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
-            .add_filter("Images", &["png", "jpg", "jpeg", "webp", "bmp"])
+            .add_filter(
+                "All Images & Vectors",
+                &[
+                    "png", "jpg", "jpeg", "webp", "bmp", "svg", "gif", "ico", "tiff",
+                ],
+            )
+            .add_filter("Vector Graphics (*.svg)", &["svg"])
+            .add_filter(
+                "Raster Images",
+                &["png", "jpg", "jpeg", "webp", "bmp", "gif", "ico", "tiff"],
+            )
             .pick_file()
         {
             if let Ok(bytes) = std::fs::read(&path) {
-                if let Ok(dyn_img) = image::load_from_memory(&bytes) {
-                    let w = dyn_img.width() as f32;
-                    let h = dyn_img.height() as f32;
-                    self.insert_image_bytes(bytes, w, h);
+                if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(&bytes) {
+                    self.insert_image_bytes(img_bytes, w, h);
                 } else {
-                    self.set_error("Could not decode selected image file.");
+                    self.set_error("Could not decode selected image or SVG file.");
                 }
             }
         }
     }
+
 
     fn insert_image_bytes(&mut self, data: Vec<u8>, width: f32, height: f32) {
         let max_dim = 450.0f32;
@@ -643,8 +1102,26 @@ impl InkkApp {
         };
 
         let page = self.notebook.current_page_mut();
-        let place_x = ((page.width - w) * 0.5).max(40.0);
-        let place_y = 120.0f32;
+
+        // Position image in the center of the user's visible viewport or near last cursor
+        let (place_x, place_y) = if self.last_pointer_pos_world != Pos2::ZERO
+            && self.last_pointer_pos_world.x >= 0.0
+            && self.last_pointer_pos_world.x <= page.width
+            && self.last_pointer_pos_world.y >= 0.0
+            && self.last_pointer_pos_world.y <= page.height
+        {
+            let px = (self.last_pointer_pos_world.x - w * 0.5).clamp(20.0, (page.width - w).max(20.0));
+            let py = (self.last_pointer_pos_world.y - h * 0.5).clamp(20.0, (page.height - h).max(20.0));
+            (px, py)
+        } else {
+            let view_center_world_x = (-self.pan.x + 450.0) / self.scale;
+            let view_center_world_y = (-self.pan.y + 350.0) / self.scale;
+            let px = (view_center_world_x - w * 0.5).clamp(20.0, (page.width - w).max(20.0));
+            let py = (view_center_world_y - h * 0.5).clamp(20.0, (page.height - h).max(20.0));
+            (px, py)
+        };
+
+        let _ = page.check_auto_expand(place_y + h + 80.0);
 
         let new_img = ImageEntity::new(place_x, place_y, w, h, data);
         let new_id = new_img.id.clone();
@@ -653,54 +1130,133 @@ impl InkkApp {
         self.clear_selection();
         self.selected_image_ids.insert(new_id);
         self.set_tool(ToolMode::LassoSelect);
+        self.autosave.mark_dirty();
         self.set_status("Image inserted & selected! 🖼 (Drag handles to resize)");
     }
 
     fn paste_from_clipboard(&mut self) {
-        if let Ok(mut clip) = arboard::Clipboard::new() {
-            if let Ok(img_data) = clip.get_image() {
-                let width = img_data.width as u32;
-                let height = img_data.height as u32;
-                if width > 0 && height > 0 {
+        // 1. Check Windows Explorer copied files (CF_HDROP)
+        let explorer_files = get_clipboard_files_windows();
+        if !explorer_files.is_empty() {
+            let mut pasted_count = 0;
+            for file_path in explorer_files {
+                if file_path.is_file() {
+                    if let Ok(bytes) = std::fs::read(&file_path) {
+                        if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(&bytes) {
+                            self.insert_image_bytes(img_bytes, w, h);
+                            pasted_count += 1;
+                        }
+                    }
+                }
+            }
+            if pasted_count > 0 {
+                self.set_status(&format!("Pasted {} image(s) from copied file(s)! 🖼", pasted_count));
+                return;
+            }
+        }
+
+        // 2. Try raw image data from clipboard with retry (Snipping tool, copy image from web/paint)
+        let mut clip = None;
+        for _ in 0..5 {
+            if let Ok(c) = arboard::Clipboard::new() {
+                clip = Some(c);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        let mut clip = match clip {
+            Some(c) => c,
+            None => {
+                self.set_error("Could not access system clipboard (locked by another application).");
+                return;
+            }
+        };
+
+        if let Ok(img_data) = clip.get_image() {
+            let width = img_data.width as u32;
+            let height = img_data.height as u32;
+            if width > 0 && height > 0 {
+                if let Some(rgba_img) =
+                    image::RgbaImage::from_raw(width, height, img_data.bytes.into_owned())
+                {
                     let mut png_bytes = Vec::new();
-                    let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
-                    use image::ImageEncoder;
-                    if encoder
-                        .write_image(&img_data.bytes, width, height, image::ExtendedColorType::Rgba8)
-                        .is_ok()
-                    {
+                    let mut cursor = std::io::Cursor::new(&mut png_bytes);
+                    if rgba_img.write_to(&mut cursor, image::ImageFormat::Png).is_ok() {
                         self.insert_image_bytes(png_bytes, width as f32, height as f32);
+                        self.set_status("Image pasted from clipboard! 🖼");
                         return;
                     }
                 }
             }
         }
+
+        // 3. Try text / file paths / SVG markup from clipboard
+        if let Ok(text) = clip.get_text() {
+            let trimmed = text.trim();
+            // Check if it's SVG XML text
+            if (trimmed.starts_with("<svg") || trimmed.starts_with("<?xml"))
+                && trimmed.contains("</svg>")
+            {
+                if let Some((png_bytes, w, h)) = Self::decode_svg_data(trimmed.as_bytes()) {
+                    self.insert_image_bytes(png_bytes, w, h);
+                    self.set_status("SVG Vector pasted & rendered! 🖼");
+                    return;
+                }
+            }
+
+            // Check if it's a file path or list of paths
+            for line in trimmed.lines() {
+                let p_str = line.trim().trim_matches('"').trim_matches('\'');
+                let path = std::path::Path::new(p_str);
+                if path.is_file() {
+                    if let Ok(bytes) = std::fs::read(path) {
+                        if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(&bytes) {
+                            self.insert_image_bytes(img_bytes, w, h);
+                            self.set_status("Image from file path pasted! 🖼");
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        self.set_error(
+            "Clipboard has no image or supported file (Copy an image or image file and press Ctrl+V).",
+        );
     }
 
     /// Main toolbar: brand, history, tools, colors, size, theme.
     fn render_top_toolbar(&mut self, ui: &mut Ui, ctx: &egui::Context) {
         let p = self.palette();
-        ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = theme::SPACE_XS;
+
+            // Brand Wordmark in Georgia Serif (restrained, no distracting sticker)
             ui.label(
-                egui::RichText::new(format!("{} Inkk", theme::icon::NOTEBOOK))
+                egui::RichText::new("Inkk")
+                    .font(theme::font_serif(16.5))
                     .strong()
-                    .size(15.0)
                     .color(p.text),
             );
             widgets::divider(ui, &p);
 
+            // History: Always reserved slots, dimmed when disabled (zero layout jump)
             let can_undo = !self.notebook.current_page().strokes.is_empty();
             let can_redo = !self.redo_stack.is_empty();
             if ui
-                .add_enabled_ui(can_undo, |ui| widgets::tool_button(ui, &p, theme::icon::UNDO, false, "Undo (Ctrl+Z)"))
+                .add_enabled_ui(can_undo, |ui| {
+                    widgets::tool_button(ui, &p, theme::icon::UNDO, false, "Undo (Ctrl+Z)")
+                })
                 .inner
                 .clicked()
             {
                 self.undo();
             }
             if ui
-                .add_enabled_ui(can_redo, |ui| widgets::tool_button(ui, &p, theme::icon::REDO, false, "Redo (Ctrl+Y)"))
+                .add_enabled_ui(can_redo, |ui| {
+                    widgets::tool_button(ui, &p, theme::icon::REDO, false, "Redo (Ctrl+Y)")
+                })
                 .inner
                 .clicked()
             {
@@ -708,86 +1264,287 @@ impl InkkApp {
             }
             widgets::divider(ui, &p);
 
-            let shape_icon = SHAPES
-                .iter()
-                .find(|(s, _, _)| *s == self.current_shape)
-                .map_or("☐", |(_, i, _)| *i);
-            let tools = [
-                (ToolMode::Pen, theme::icon::PEN, "Pen (1)"),
-                (ToolMode::Highlighter, theme::icon::HIGHLIGHTER, "Highlighter (2)"),
-                (ToolMode::Shape(self.current_shape), shape_icon, "Shapes (3)"),
-                (ToolMode::Text, "T", "Text Box (4 / T)"),
-                (ToolMode::EraserStroke, theme::icon::ERASER_STROKE, "Stroke eraser (5)"),
-                (ToolMode::EraserPoint, theme::icon::ERASER_POINT, "Point eraser (6)"),
-                (ToolMode::LassoSelect, theme::icon::LASSO, "Lasso select (7)"),
-                (ToolMode::Pan, theme::icon::PAN, "Pan (8)"),
-            ];
-            for (mode, icon, tip) in tools {
-                let active = match (self.tool, mode) {
-                    (ToolMode::Shape(_), ToolMode::Shape(_)) => true,
-                    (a, b) => a == b,
-                };
-                if widgets::tool_button(ui, &p, icon, active, tip).clicked() {
-                    self.set_tool(mode);
+            // Document Actions: Library, Save, Pages, Open, Export to PDF
+            let docs_resp = ui.scope(|ui| {
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Library,
+                    self.library.is_open,
+                    "Notebook Library & Bookshelf (Ctrl+L)",
+                )
+                .clicked()
+                {
+                    if self.library.is_open {
+                        self.library.is_open = false;
+                    } else {
+                        self.library.open(self.current_file_path.as_deref());
+                    }
                 }
-            }
+                if widgets::tool_button(ui, &p, VectorIcon::Save, false, "Save (Ctrl+S)").clicked() {
+                    self.prompt_save_file();
+                }
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Pages,
+                    self.show_previews_drawer,
+                    "Show page previews",
+                )
+                .clicked()
+                {
+                    self.show_previews_drawer = !self.show_previews_drawer;
+                }
+                if widgets::tool_button(ui, &p, VectorIcon::Open, false, "Open (Ctrl+O)").clicked() {
+                    self.prompt_open_file();
+                }
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Pdf,
+                    false,
+                    "Export Notebook to PDF (Ctrl+Shift+E)",
+                )
+                .clicked()
+                {
+                    self.prompt_export_pdf();
+                }
+            });
+            self.onboarding_tour.rect_docs = docs_resp.response.rect;
+            widgets::divider(ui, &p);
+
+            let tools_resp = ui.scope(|ui| {
+                let shape_vicon = self.current_shape.vector_icon();
+                let tools: [(ToolMode, widgets::ToolIcon<'static>, &str); 8] = [
+                    (ToolMode::Pen, theme::icon::PEN.into(), "Pen (1)"),
+                    (
+                        ToolMode::Highlighter,
+                        theme::icon::HIGHLIGHTER.into(),
+                        "Highlighter (2)",
+                    ),
+                    (
+                        ToolMode::Shape(self.current_shape),
+                        shape_vicon.into(),
+                        "Shapes (3)",
+                    ),
+                    (ToolMode::Text, "T".into(), "Text Box (4 / T)"),
+                    (
+                        ToolMode::EraserStroke,
+                        theme::icon::ERASER_STROKE.into(),
+                        "Stroke eraser (5)",
+                    ),
+                    (
+                        ToolMode::EraserPoint,
+                        theme::icon::ERASER_POINT.into(),
+                        "Point eraser (6)",
+                    ),
+                    (
+                        ToolMode::LassoSelect,
+                        theme::icon::LASSO.into(),
+                        "Lasso select (7)",
+                    ),
+                    (ToolMode::Pan, theme::icon::PAN.into(), "Pan (8)"),
+                ];
+                for (mode, icon, tip) in tools {
+                    let active = match (self.tool, mode) {
+                        (ToolMode::Shape(_), ToolMode::Shape(_)) => true,
+                        (a, b) => a == b,
+                    };
+                    if widgets::tool_button(ui, &p, icon, active, tip).clicked() {
+                        self.set_tool(mode);
+                    }
+                }
+            });
+            self.onboarding_tour.rect_tools = tools_resp.response.rect;
             widgets::divider(ui, &p);
 
             // Stencil Tools: Straight Ruler & Circular Protractor
-            let ruler_active = self.ruler.kind == RulerKind::Ruler;
-            if widgets::tool_button(ui, &p, theme::icon::RULER, ruler_active, "Straight Ruler (R)").clicked() {
-                self.ruler.toggle_ruler();
-                let is_on = self.ruler.kind == RulerKind::Ruler;
-                self.set_status(if is_on { "Straight Ruler ON 📏 (drag body to move, dial to rotate)" } else { "Ruler OFF" });
-            }
-            let protractor_active = self.ruler.kind == RulerKind::Protractor;
-            if widgets::tool_button(ui, &p, theme::icon::PROTRACTOR, protractor_active, "Circular Protractor (Shift+R)").clicked() {
-                self.ruler.toggle_protractor();
-                let is_on = self.ruler.kind == RulerKind::Protractor;
-                self.set_status(if is_on { "Protractor ON 📐 (drag body to move, dial to rotate)" } else { "Protractor OFF" });
-            }
+            let stencils_resp = ui.scope(|ui| {
+                let ruler_active = self.ruler.kind == RulerKind::Ruler;
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    theme::icon::RULER,
+                    ruler_active,
+                    "Straight Ruler (R)",
+                )
+                .clicked()
+                {
+                    self.ruler.toggle_ruler();
+                    let is_on = self.ruler.kind == RulerKind::Ruler;
+                    self.set_status(if is_on {
+                        "Straight Ruler ON 📏 (drag body to move, dial to rotate)"
+                    } else {
+                        "Ruler OFF"
+                    });
+                }
+                let protractor_active = self.ruler.kind == RulerKind::Protractor;
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    theme::icon::PROTRACTOR,
+                    protractor_active,
+                    "Circular Protractor (Shift+R)",
+                )
+                .clicked()
+                {
+                    self.ruler.toggle_protractor();
+                    let is_on = self.ruler.kind == RulerKind::Protractor;
+                    self.set_status(if is_on {
+                        "Protractor ON 📐 (drag body to move, dial to rotate)"
+                    } else {
+                        "Protractor OFF"
+                    });
+                }
+            });
+            self.onboarding_tour.rect_stencils = stencils_resp.response.rect;
             widgets::divider(ui, &p);
 
             // Picture Tool: Insert Image from File
-            if widgets::tool_button(ui, &p, theme::icon::PICTURE, false, "Insert Image from file (or Ctrl+V to paste)").clicked() {
+            if widgets::tool_button(
+                ui,
+                &p,
+                theme::icon::PICTURE,
+                false,
+                "Insert Image from file (or Ctrl+V to paste)",
+            )
+            .clicked()
+            {
                 self.prompt_insert_image();
             }
             widgets::divider(ui, &p);
 
-            // Math Studio: MATLAB IDE & Plotting Engine
-            let math_active = self.math_studio.is_open;
-            if widgets::tool_button(ui, &p, "🔬", math_active, "Math Studio & MATLAB IDE (M / Ctrl+M)").clicked() {
-                self.math_studio.toggle();
-                let is_on = self.math_studio.is_open;
-                self.set_status(if is_on { "Math Studio OPEN 🔬 [MATLAB Engine Ready]" } else { "Math Studio CLOSED" });
-            }
+            // Math Studio & Mathematical Entities Tools
+            let math_resp = ui.scope(|ui| {
+                let math_active = self.math_studio.is_open;
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::MathStudio,
+                    math_active,
+                    "Math Studio & MATLAB IDE (M / Ctrl+M)",
+                )
+                .clicked()
+                {
+                    self.math_studio.toggle();
+                    let is_on = self.math_studio.is_open;
+                    self.set_status(if is_on {
+                        "Math Studio OPEN [MATLAB Engine Ready]"
+                    } else {
+                        "Math Studio CLOSED"
+                    });
+                }
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Matrix,
+                    self.matrix_dialog.is_open,
+                    "Insert Matrix (MATLAB code or UI)",
+                )
+                .clicked()
+                {
+                    self.matrix_dialog.open_new();
+                }
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Axes,
+                    self.axes_dialog.is_open,
+                    "Insert Coordinate Axes (1D / 2D / 3D)",
+                )
+                .clicked()
+                {
+                    self.axes_dialog.open_new();
+                }
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Table,
+                    self.table_dialog.is_open,
+                    "Insert Data Table (UI / CSV)",
+                )
+                .clicked()
+                {
+                    self.table_dialog.open_new();
+                }
+                let flowchart_active = self.flowchart_editor.is_open;
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Flowchart,
+                    flowchart_active,
+                    "Flowchart Studio & Algorithm Editor (Ctrl+F)",
+                )
+                .clicked()
+                {
+                    self.flowchart_editor.toggle();
+                    let is_on = self.flowchart_editor.is_open;
+                    self.set_status(if is_on {
+                        "Flowchart Studio OPEN"
+                    } else {
+                        "Flowchart Studio CLOSED"
+                    });
+                }
+            });
+            self.onboarding_tour.rect_math = math_resp.response.rect;
             widgets::divider(ui, &p);
 
-            // Picking a color also switches back to an inking tool or updates text color
-            for (c, name) in theme::ink_swatches(self.is_dark_mode) {
-                if widgets::color_swatch(ui, &p, c, self.color == c, name).clicked() {
-                    self.color = c;
-                    if let Some(ref sel_id) = self.editing_text_id {
-                        let c_arr = [c.r(), c.g(), c.b(), c.a()];
-                        for tb in &mut self.notebook.current_page_mut().text_boxes {
-                            if tb.id == *sel_id {
-                                tb.color = c_arr;
-                            }
+            // Bespoke Ink Palette Popover (Archival Inks, Custom Swatches, 2D Spectrum & Density)
+            let old_color = self.color;
+            widgets::ink_palette_button(
+                ui,
+                &p,
+                &mut self.color,
+                &mut self.custom_swatches,
+                &mut self.opacity,
+                self.is_dark_mode,
+            );
+            if self.color != old_color {
+                if let Some(ref sel_id) = self.editing_text_id {
+                    let c_arr = [
+                        self.color.r(),
+                        self.color.g(),
+                        self.color.b(),
+                        self.color.a(),
+                    ];
+                    for tb in &mut self.notebook.current_page_mut().text_boxes {
+                        if tb.id == *sel_id {
+                            tb.color = c_arr;
                         }
-                    } else if matches!(self.tool, ToolMode::EraserStroke | ToolMode::EraserPoint | ToolMode::Pan) {
-                        self.set_tool(ToolMode::Pen);
                     }
+                } else if matches!(
+                    self.tool,
+                    ToolMode::EraserStroke | ToolMode::EraserPoint | ToolMode::Pan
+                ) {
+                    self.set_tool(ToolMode::Pen);
                 }
             }
-            ui.color_edit_button_srgba(&mut self.color).on_hover_text("Custom color");
-            widgets::divider(ui, &p);
 
-            // Live size preview dot next to the slider
-            let (dot_rect, _) = ui.allocate_exact_size(Vec2::splat(26.0), Sense::hover());
-            ui.painter().circle_filled(dot_rect.center(), (self.size * 0.5).clamp(1.5, 12.0), self.color);
-            ui.painter().circle_stroke(dot_rect.center(), 12.5, Stroke::new(1.0_f32, p.border));
-            ui.add(egui::Slider::new(&mut self.size, 1.0..=30.0).suffix(" px").show_value(true))
-                .on_hover_text("Stroke size ( [ / ] )");
+            // Live size & dilution preview dot next to the slider
+            let (dot_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), Sense::hover());
+            let alpha_u8 = ((self.opacity).clamp(0.1, 1.0) * 255.0) as u8;
+            let preview_color = Color32::from_rgba_unmultiplied(
+                self.color.r(),
+                self.color.g(),
+                self.color.b(),
+                alpha_u8,
+            );
+            ui.painter().circle_filled(
+                dot_rect.center(),
+                (self.size * 0.45).clamp(1.5, 9.5),
+                preview_color,
+            );
+            ui.painter()
+                .circle_stroke(dot_rect.center(), 10.5, Stroke::new(1.0_f32, p.border));
+            ui.scope(|ui| {
+                ui.spacing_mut().slider_width = 55.0;
+                ui.add(
+                    egui::Slider::new(&mut self.size, 1.0..=30.0)
+                        .suffix(" pt")
+                        .show_value(true),
+                )
+                .on_hover_text("Stroke thickness ( [ / ] )");
+            });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let (icon, tip) = if self.is_dark_mode {
@@ -798,13 +1555,24 @@ impl InkkApp {
                 if widgets::tool_button(ui, &p, icon, false, tip).clicked() {
                     self.toggle_theme(ctx);
                 }
+                if widgets::tool_button(
+                    ui,
+                    &p,
+                    VectorIcon::Autosave,
+                    self.autosave.show_settings_dialog,
+                    "Autosave & Crash Recovery Settings",
+                )
+                .clicked()
+                {
+                    self.autosave.show_settings_dialog = !self.autosave.show_settings_dialog;
+                }
             });
         });
     }
     /// Second toolbar row with options for the active tool and the page.
     fn render_context_bar(&mut self, ui: &mut Ui) {
         let p = self.palette();
-        ui.horizontal_wrapped(|ui| {
+        ui.horizontal(|ui| {
             match self.tool {
                 ToolMode::Pen => {
                     widgets::caption(ui, &p, "Pen");
@@ -820,29 +1588,82 @@ impl InkkApp {
                     }
                 }
                 ToolMode::Shape(_) => {
-                    widgets::caption(ui, &p, "Shape");
-                    for (shape, icon, name) in SHAPES {
-                        if widgets::tool_button(ui, &p, icon, self.current_shape == shape, name).clicked() {
-                            self.current_shape = shape;
-                            self.tool = ToolMode::Shape(shape);
+                    widgets::caption(ui, &p, "Lines");
+                    for (shape, icon, name) in &SHAPES[0..3] {
+                        if widgets::tool_button(ui, &p, *icon, self.current_shape == *shape, *name)
+                            .clicked()
+                        {
+                            self.current_shape = *shape;
+                            self.tool = ToolMode::Shape(*shape);
                         }
                     }
                     widgets::divider(ui, &p);
+
+                    widgets::caption(ui, &p, "Basic");
+                    for (shape, icon, name) in &SHAPES[3..9] {
+                        if widgets::tool_button(ui, &p, *icon, self.current_shape == *shape, *name)
+                            .clicked()
+                        {
+                            self.current_shape = *shape;
+                            self.tool = ToolMode::Shape(*shape);
+                        }
+                    }
+                    widgets::divider(ui, &p);
+
+                    widgets::caption(ui, &p, "Graphs");
+                    for (shape, icon, name) in &SHAPES[9..12] {
+                        if widgets::tool_button(ui, &p, *icon, self.current_shape == *shape, *name)
+                            .clicked()
+                        {
+                            self.current_shape = *shape;
+                            self.tool = ToolMode::Shape(*shape);
+                        }
+                    }
+                    widgets::divider(ui, &p);
+
+                    widgets::caption(ui, &p, "3D Solids");
+                    for (shape, icon, name) in &SHAPES[12..15] {
+                        if widgets::tool_button(ui, &p, *icon, self.current_shape == *shape, *name)
+                            .clicked()
+                        {
+                            self.current_shape = *shape;
+                            self.tool = ToolMode::Shape(*shape);
+                        }
+                    }
+                    widgets::divider(ui, &p);
+
                     if widgets::chip(ui, &p, "Filled", self.is_shape_filled).clicked() {
                         self.is_shape_filled = !self.is_shape_filled;
                     }
+
                 }
                 ToolMode::Highlighter => {
-                    widgets::caption(ui, &p, "Highlighter draws beneath ink so text stays readable");
+                    widgets::caption(
+                        ui,
+                        &p,
+                        "Highlighter draws beneath ink so text stays readable",
+                    );
                 }
                 ToolMode::EraserStroke => {
-                    widgets::caption(ui, &p, "Removes whole strokes it touches · size slider sets radius");
+                    widgets::caption(
+                        ui,
+                        &p,
+                        "Removes whole strokes it touches · size slider sets radius",
+                    );
                 }
                 ToolMode::EraserPoint => {
-                    widgets::caption(ui, &p, "Cuts strokes where it passes · size slider sets radius");
+                    widgets::caption(
+                        ui,
+                        &p,
+                        "Cuts strokes where it passes · size slider sets radius",
+                    );
                 }
                 ToolMode::LassoSelect => {
-                    widgets::caption(ui, &p, "Draw around strokes or click one · drag to move · Del to delete");
+                    widgets::caption(
+                        ui,
+                        &p,
+                        "Draw around strokes or click one · drag to move · Del to delete",
+                    );
                 }
                 ToolMode::Pan => {
                     widgets::caption(ui, &p, "Drag to move the page · Ctrl + wheel to zoom");
@@ -886,9 +1707,13 @@ impl InkkApp {
                     }
                     widgets::divider(ui, &p);
                     if self.editing_text_id.is_some() {
-                        if widgets::tool_button(ui, &p, "🗑", false, "Delete Text Box").clicked() {
+                        if widgets::tool_button(ui, &p, "🗑", false, "Delete Text Box").clicked()
+                        {
                             if let Some(ref id) = self.editing_text_id.take() {
-                                self.notebook.current_page_mut().text_boxes.retain(|tb| tb.id != *id);
+                                self.notebook
+                                    .current_page_mut()
+                                    .text_boxes
+                                    .retain(|tb| tb.id != *id);
                                 self.set_status("Deleted text box");
                             }
                         }
@@ -896,18 +1721,22 @@ impl InkkApp {
                             self.editing_text_id = None;
                         }
                     } else {
-                        widgets::caption(ui, &p, "Click canvas to type · Drag top strip to move · right edge to resize");
+                        widgets::caption(
+                            ui,
+                            &p,
+                            "Click canvas to type · Drag top strip to move · right edge to resize",
+                        );
                     }
                 }
             }
 
-            if matches!(self.tool, ToolMode::Pen | ToolMode::Highlighter | ToolMode::Shape(_)) {
+            if matches!(
+                self.tool,
+                ToolMode::Pen | ToolMode::Highlighter | ToolMode::Shape(_)
+            ) {
                 widgets::divider(ui, &p);
                 widgets::caption(ui, &p, "Opacity");
-                ui.add(
-                    egui::Slider::new(&mut self.opacity, 0.1..=1.0)
-                        .custom_formatter(|v, _| format!("{:.0}%", v * 100.0)),
-                );
+                widgets::smart_opacity_control(ui, &p, &mut self.opacity, self.color);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -933,48 +1762,108 @@ impl InkkApp {
     fn render_bottom_bar(&mut self, ui: &mut Ui, available_size: Vec2) {
         let p = self.palette();
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            ui.add(
+            ui.spacing_mut().item_spacing.x = theme::SPACE_SM;
+
+            // Click-to-edit Notebook Title in Georgia Serif (no ugly raw input box)
+            let title_edit = ui.add(
                 egui::TextEdit::singleline(&mut self.notebook.title)
-                    .desired_width(180.0)
-                    .hint_text("Notebook title"),
-            )
-            .on_hover_text("Notebook title");
+                    .font(theme::font_serif(15.0))
+                    .text_color(p.text)
+                    .frame(false)
+                    .desired_width(190.0)
+                    .hint_text("Untitled Notebook"),
+            );
+            if title_edit.hovered() || title_edit.has_focus() {
+                let r = title_edit.rect;
+                ui.painter().line_segment(
+                    [Pos2::new(r.min.x, r.max.y), Pos2::new(r.max.x, r.max.y)],
+                    Stroke::new(
+                        1.0_f32,
+                        if title_edit.has_focus() {
+                            p.accent
+                        } else {
+                            p.border
+                        },
+                    ),
+                );
+            }
+            title_edit.on_hover_text("Click to rename notebook");
             widgets::divider(ui, &p);
 
             let cur_idx = self.notebook.current_page_index;
             let total = self.notebook.pages.len();
-            if ui.add_enabled_ui(cur_idx > 0, |ui| widgets::tool_button(ui, &p, theme::icon::PREV, false, "Previous page (PgUp)")).inner.clicked() {
+            if ui
+                .add_enabled_ui(cur_idx > 0, |ui| {
+                    widgets::tool_button(ui, &p, theme::icon::PREV, false, "Previous page (PgUp)")
+                })
+                .inner
+                .clicked()
+            {
                 self.go_to_page(cur_idx.saturating_sub(1));
             }
-            let pages_label = format!("{} Page {} / {}", theme::icon::PAGES, cur_idx + 1, total);
-            if widgets::chip(ui, &p, &pages_label, self.show_previews_drawer)
-                .on_hover_text("Show page previews")
-                .clicked()
+            let pages_label = format!("Page {} / {}", cur_idx + 1, total);
+            if widgets::vector_chip(
+                ui,
+                &p,
+                VectorIcon::Pages,
+                &pages_label,
+                self.show_previews_drawer,
+            )
+            .on_hover_text("Show page previews")
+            .clicked()
             {
                 self.show_previews_drawer = !self.show_previews_drawer;
             }
-            if ui.add_enabled_ui(cur_idx + 1 < total, |ui| widgets::tool_button(ui, &p, theme::icon::NEXT, false, "Next page (PgDn)")).inner.clicked() {
+            if ui
+                .add_enabled_ui(cur_idx + 1 < total, |ui| {
+                    widgets::tool_button(ui, &p, theme::icon::NEXT, false, "Next page (PgDn)")
+                })
+                .inner
+                .clicked()
+            {
                 self.go_to_page(cur_idx + 1);
             }
-            if widgets::tool_button(ui, &p, theme::icon::ADD, false, "Add page after this one").clicked() {
+            if widgets::tool_button(ui, &p, theme::icon::ADD, false, "Add page after this one")
+                .clicked()
+            {
                 self.notebook.add_page();
                 self.selected_stroke_ids.clear();
+                self.autosave.mark_dirty();
             }
-            if widgets::tool_button(ui, &p, theme::icon::EXTEND, false, "Extend page by 600 px").clicked() {
+            if widgets::tool_button(ui, &p, theme::icon::EXTEND, false, "Extend page by 600 px")
+                .clicked()
+            {
                 self.notebook.current_page_mut().extend_height(600.0);
                 self.set_status("Page extended +600 px");
+                self.autosave.mark_dirty();
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if widgets::primary_button(ui, &p, &format!("{} Save", theme::icon::SAVE))
-                    .on_hover_text("Save as .inkk (Ctrl+S)")
+                if widgets::primary_icon_button(ui, &p, VectorIcon::Save, "Save")
+                    .on_hover_text("Save notebook (Ctrl+S)")
                     .clicked()
                 {
                     self.prompt_save_file();
                 }
-                if ui.button(format!("{} Open", theme::icon::OPEN)).on_hover_text("Open .inkk (Ctrl+O)").clicked() {
-                    self.prompt_open_file();
+                widgets::divider(ui, &p);
+
+                // Autosave Status Pill
+                let autosave_label = if self.autosave.enabled {
+                    format!("Autosave: {}", self.autosave.interval.short_label())
+                } else {
+                    "Autosave: OFF".to_string()
+                };
+                if widgets::vector_chip(
+                    ui,
+                    &p,
+                    VectorIcon::Autosave,
+                    &autosave_label,
+                    self.autosave.show_settings_dialog,
+                )
+                .on_hover_text("Autosave & Crash Recovery Settings • Click to configure")
+                .clicked()
+                {
+                    self.autosave.show_settings_dialog = !self.autosave.show_settings_dialog;
                 }
                 widgets::divider(ui, &p);
 
@@ -984,7 +1873,11 @@ impl InkkApp {
                 }
                 let zoom_label = format!("{}%", (self.scale * 100.0).round() as i32);
                 if ui
-                    .add(egui::Button::new(egui::RichText::new(zoom_label).monospace()).frame(false).min_size(Vec2::new(48.0, 28.0)))
+                    .add(
+                        egui::Button::new(egui::RichText::new(zoom_label).monospace())
+                            .frame(false)
+                            .min_size(Vec2::new(48.0, 28.0)),
+                    )
                     .on_hover_text("Reset to 100% (Ctrl+0)")
                     .clicked()
                 {
@@ -993,7 +1886,9 @@ impl InkkApp {
                 if widgets::tool_button(ui, &p, "−", false, "Zoom out (Ctrl + wheel)").clicked() {
                     self.zoom_by(0.85, available_size);
                 }
-                if widgets::tool_button(ui, &p, theme::icon::FIT, false, "Fit page to window").clicked() {
+                if widgets::tool_button(ui, &p, theme::icon::FIT, false, "Fit page to window")
+                    .clicked()
+                {
                     self.fit_to_window(available_size);
                 }
             });
@@ -1026,16 +1921,24 @@ impl InkkApp {
             .resizable(true)
             .default_width(240.0)
             .width_range(180.0..=420.0)
-            .frame(egui::Frame::side_top_panel(&ctx.style()).fill(p.surface).inner_margin(12.0))
+            .frame(
+                egui::Frame::side_top_panel(&ctx.style())
+                    .fill(p.surface)
+                    .inner_margin(12.0),
+            )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new("Pages").strong().size(15.0));
                     widgets::caption(ui, &p, format!("{}", self.notebook.pages.len()));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if widgets::tool_button(ui, &p, theme::icon::CLOSE, false, "Close").clicked() {
+                        if widgets::tool_button(ui, &p, theme::icon::CLOSE, false, "Close")
+                            .clicked()
+                        {
                             self.show_previews_drawer = false;
                         }
-                        if widgets::tool_button(ui, &p, theme::icon::ADD, false, "Add page").clicked() {
+                        if widgets::tool_button(ui, &p, theme::icon::ADD, false, "Add page")
+                            .clicked()
+                        {
                             self.notebook.add_page();
                             self.clear_selection();
                         }
@@ -1053,65 +1956,99 @@ impl InkkApp {
                 let total = self.notebook.pages.len();
                 let cur_idx = self.notebook.current_page_index;
 
-                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                    let card_w = ui.available_width() - 4.0;
-                    for idx in 0..total {
-                        let page = &self.notebook.pages[idx];
-                        let is_active = idx == cur_idx;
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        let card_w = ui.available_width() - 4.0;
+                        for idx in 0..total {
+                            let page = &self.notebook.pages[idx];
+                            let is_active = idx == cur_idx;
 
-                        // Fit width; long (extended) pages show their top portion.
-                        let thumb_scale = card_w / page.width;
-                        let thumb_h = (page.height * thumb_scale).min(card_w * 1.414);
-                        let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, thumb_h), Sense::click());
-                        let resp = resp.on_hover_text(format!("Go to page {}", idx + 1));
-                        if resp.clicked() {
-                            action = Some(PageAction::Select(idx));
-                        }
+                            // Fit width; long (extended) pages show their top portion.
+                            let thumb_scale = card_w / page.width;
+                            let thumb_h = (page.height * thumb_scale).min(card_w * 1.414);
+                            let (rect, resp) =
+                                ui.allocate_exact_size(Vec2::new(card_w, thumb_h), Sense::click());
+                            let resp = resp.on_hover_text(format!("Go to page {}", idx + 1));
+                            if resp.clicked() {
+                                action = Some(PageAction::Select(idx));
+                            }
 
-                        let painter = ui.painter_at(rect.expand(4.0));
-                        let to_thumb = |pt: Pos2| rect.min + pt.to_vec2() * thumb_scale;
-                        let page_rect = Rect::from_min_size(rect.min, Vec2::new(page.width, page.height) * thumb_scale);
-                        NoteRenderer::render_background(
-                            &painter.with_clip_rect(rect),
-                            page_rect,
-                            page.paper_type,
-                            page.width,
-                            page.height,
-                            thumb_scale,
-                            &to_thumb,
-                            is_dark,
-                        );
-                        NoteRenderer::render_strokes(&painter.with_clip_rect(rect), &page.strokes, thumb_scale, &to_thumb);
+                            let painter = ui.painter_at(rect.expand(4.0));
+                            let to_thumb = |pt: Pos2| rect.min + pt.to_vec2() * thumb_scale;
+                            let page_rect = Rect::from_min_size(
+                                rect.min,
+                                Vec2::new(page.width, page.height) * thumb_scale,
+                            );
+                            NoteRenderer::render_background(
+                                &painter.with_clip_rect(rect),
+                                page_rect,
+                                page.paper_type,
+                                page.width,
+                                page.height,
+                                thumb_scale,
+                                &to_thumb,
+                                is_dark,
+                            );
+                            NoteRenderer::render_strokes(
+                                &painter.with_clip_rect(rect),
+                                &page.strokes,
+                                thumb_scale,
+                                &to_thumb,
+                            );
 
-                        let ring = if is_active {
-                            Stroke::new(2.0_f32, p.accent)
-                        } else if resp.hovered() {
-                            Stroke::new(1.5_f32, p.text_muted)
-                        } else {
-                            Stroke::new(1.0_f32, p.border)
-                        };
-                        painter.rect_stroke(rect, theme::RADIUS_SMALL, ring);
+                            let ring = if is_active {
+                                Stroke::new(2.0_f32, p.accent)
+                            } else if resp.hovered() {
+                                Stroke::new(1.5_f32, p.text_muted)
+                            } else {
+                                Stroke::new(1.0_f32, p.border)
+                            };
+                            painter.rect_stroke(rect, theme::RADIUS_SMALL, ring);
 
-                        ui.horizontal(|ui| {
-                            let label = egui::RichText::new(format!("Page {}", idx + 1));
-                            ui.label(if is_active { label.color(p.accent).strong() } else { label.color(p.text_muted) });
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                let can_delete = total > 1;
-                                if ui
-                                    .add_enabled_ui(can_delete, |ui| widgets::tool_button(ui, &p, theme::icon::DELETE, false, "Delete page"))
-                                    .inner
-                                    .clicked()
-                                {
-                                    action = Some(PageAction::Delete(idx));
-                                }
-                                if widgets::tool_button(ui, &p, theme::icon::DUPLICATE, false, "Duplicate page").clicked() {
-                                    action = Some(PageAction::Duplicate(idx));
-                                }
+                            ui.horizontal(|ui| {
+                                let label = egui::RichText::new(format!("Page {}", idx + 1));
+                                ui.label(if is_active {
+                                    label.color(p.accent).strong()
+                                } else {
+                                    label.color(p.text_muted)
+                                });
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        let can_delete = total > 1;
+                                        if ui
+                                            .add_enabled_ui(can_delete, |ui| {
+                                                widgets::tool_button(
+                                                    ui,
+                                                    &p,
+                                                    theme::icon::DELETE,
+                                                    false,
+                                                    "Delete page",
+                                                )
+                                            })
+                                            .inner
+                                            .clicked()
+                                        {
+                                            action = Some(PageAction::Delete(idx));
+                                        }
+                                        if widgets::tool_button(
+                                            ui,
+                                            &p,
+                                            theme::icon::DUPLICATE,
+                                            false,
+                                            "Duplicate page",
+                                        )
+                                        .clicked()
+                                        {
+                                            action = Some(PageAction::Duplicate(idx));
+                                        }
+                                    },
+                                );
                             });
-                        });
-                        ui.add_space(10.0);
-                    }
-                });
+                            ui.add_space(10.0);
+                        }
+                    });
 
                 match action {
                     Some(PageAction::Select(idx)) => self.go_to_page(idx),
@@ -1135,6 +2072,7 @@ impl InkkApp {
         let page = self.notebook.current_page_mut();
         if let Some(popped) = page.strokes.pop() {
             self.redo_stack.push(popped);
+            self.autosave.mark_dirty();
         }
         self.clear_selection();
     }
@@ -1143,22 +2081,397 @@ impl InkkApp {
         if let Some(stroke) = self.redo_stack.pop() {
             let page = self.notebook.current_page_mut();
             page.strokes.push(stroke);
+            self.autosave.mark_dirty();
         }
         self.clear_selection();
     }
 
     fn prompt_save_file(&mut self) {
+        if let Some(ref path) = self.current_file_path.clone() {
+            if let Err(e) = NotebookStorage::save(path, &self.notebook) {
+                self.set_error(&format!("Save failed: {}", e));
+            } else {
+                self.autosave.mark_clean();
+                self.set_status("Notebook saved 💾");
+            }
+            return;
+        }
+        self.prompt_save_as_file();
+    }
+
+    fn prompt_save_as_file(&mut self) {
+        let default_name = if self.notebook.title.trim().is_empty() {
+            "notebook.handnote".to_string()
+        } else {
+            format!("{}.handnote", self.notebook.title.trim())
+        };
         if let Some(path) = rfd::FileDialog::new()
-            .set_title("Save Notebook")
-            .add_filter("Inkk Notebook (*.inkk, *.handnote)", &["inkk", "handnote"])
-            .set_file_name(&format!("{}.inkk", self.notebook.title))
+            .set_title("Save Notebook As")
+            .add_filter("Inkk Notebook (*.handnote, *.inkk)", &["handnote", "inkk"])
+            .set_file_name(&default_name)
             .save_file()
         {
             if let Err(e) = NotebookStorage::save(&path, &self.notebook) {
                 self.set_error(&format!("Save failed: {}", e));
             } else {
                 self.current_file_path = Some(path);
-                self.set_status("Notebook saved");
+                self.autosave.mark_clean();
+                self.set_status("Notebook saved 💾");
+            }
+        }
+    }
+
+    fn prompt_export_pdf(&mut self) {
+        self.show_pdf_export_dialog = true;
+    }
+
+    fn execute_export_pdf(&mut self) {
+        let suggested_name = if self.notebook.title.trim().is_empty() {
+            "notebook.pdf".to_string()
+        } else {
+            format!("{}.pdf", self.notebook.title.trim())
+        };
+        if let Some(path) = rfd::FileDialog::new()
+            .set_title("Export Notebook to PDF")
+            .add_filter("PDF Document (*.pdf)", &["pdf"])
+            .set_file_name(&suggested_name)
+            .save_file()
+        {
+            let options = self.pdf_export_quality.to_options(self.pdf_include_patterns, self.pdf_force_light);
+            let quality_lbl = self.pdf_export_quality.label();
+            match crate::pdf_export::PdfExporter::export_notebook(&self.notebook, &options) {
+                Ok(pdf_bytes) => {
+                    if let Err(e) = crate::pdf_export::PdfExporter::save_to_file(&pdf_bytes, &path) {
+                        self.set_error(&format!("PDF export failed: {}", e));
+                    } else {
+                        let count = self.notebook.pages.len();
+                        self.set_status(&format!(
+                            "Exported {} page(s) to PDF ({}) successfully! 🦑",
+                            count, quality_lbl
+                        ));
+                    }
+                }
+                Err(e) => {
+                    self.set_error(&format!("PDF export failed: {}", e));
+                }
+            }
+        }
+    }
+
+    fn render_pdf_export_dialog(&mut self, ctx: &egui::Context, p: &crate::theme::Palette) {
+        if !self.show_pdf_export_dialog {
+            return;
+        }
+
+        let mut is_open = self.show_pdf_export_dialog;
+        let mut trigger_export = false;
+        let mut cancel_clicked = false;
+
+        egui::Window::new("📄 Export Notebook to PDF")
+            .open(&mut is_open)
+            .resizable(false)
+            .collapsible(false)
+            .default_size([460.0, 390.0])
+            .pivot(egui::Align2::CENTER_CENTER)
+            .default_pos(ctx.screen_rect().center())
+            .show(ctx, |ui| {
+                ui.spacing_mut().item_spacing.y = 8.0;
+
+                ui.label(
+                    egui::RichText::new("Choose export quality and print settings for your document:")
+                        .size(11.5)
+                        .color(p.text_muted),
+                );
+
+                ui.add_space(2.0);
+                ui.label(
+                    egui::RichText::new("Resolution & Quality Preset")
+                        .font(crate::theme::font_serif(13.0))
+                        .strong()
+                        .color(p.text),
+                );
+
+                // 3 Quality Preset Cards: Low, Medium, High
+                let presets = [
+                    (
+                        crate::pdf_export::PdfQualityPreset::Low,
+                        "Low Quality",
+                        "120 DPI • Compact (~1.2 MB)",
+                        "Fast export, minimal file size. Great for email and quick web previews.",
+                    ),
+                    (
+                        crate::pdf_export::PdfQualityPreset::Medium,
+                        "Medium Quality",
+                        "240 DPI • Standard (~3.5 MB)",
+                        "High fidelity and balanced file size. Ideal for digital notes and reading.",
+                    ),
+                    (
+                        crate::pdf_export::PdfQualityPreset::High,
+                        "High Quality (Ultra-HD)",
+                        "380+ DPI • Print-Ready (~8.5 MB)",
+                        "Maximum sharpness with sub-pixel Bezier smoothing. Razor-sharp vector print.",
+                    ),
+                ];
+
+                for (preset, title, sub, desc) in presets {
+                    let is_selected = self.pdf_export_quality == preset;
+                    let (card_rect, card_resp) = ui.allocate_exact_size(
+                        Vec2::new(ui.available_width(), 52.0),
+                        egui::Sense::click(),
+                    );
+
+                    if card_resp.clicked() {
+                        self.pdf_export_quality = preset;
+                    }
+
+                    if ui.is_rect_visible(card_rect) {
+                        let painter = ui.painter();
+                        let bg = if is_selected {
+                            p.accent_soft
+                        } else if card_resp.hovered() {
+                            p.hover
+                        } else {
+                            p.surface_alt
+                        };
+                        let border_stroke = if is_selected {
+                            Stroke::new(1.5_f32, p.accent)
+                        } else {
+                            Stroke::new(1.0_f32, p.border)
+                        };
+
+                        painter.rect(card_rect, egui::Rounding::same(crate::theme::RADIUS_MD), bg, border_stroke);
+
+                        // Radio dot on left
+                        let radio_c = Pos2::new(card_rect.min.x + 18.0, card_rect.center().y);
+                        painter.circle_stroke(radio_c, 7.0, Stroke::new(1.5_f32, if is_selected { p.accent } else { p.border }));
+                        if is_selected {
+                            painter.circle_filled(radio_c, 4.0, p.accent);
+                        }
+
+                        // Title & Subtext
+                        let text_x = card_rect.min.x + 36.0;
+                        painter.text(
+                            Pos2::new(text_x, card_rect.min.y + 10.0),
+                            egui::Align2::LEFT_TOP,
+                            title,
+                            egui::FontId::proportional(13.0),
+                            if is_selected { p.accent } else { p.text },
+                        );
+
+                        painter.text(
+                            Pos2::new(card_rect.max.x - 12.0, card_rect.min.y + 10.0),
+                            egui::Align2::RIGHT_TOP,
+                            sub,
+                            egui::FontId::monospace(10.0),
+                            p.text_muted,
+                        );
+
+                        painter.text(
+                            Pos2::new(text_x, card_rect.min.y + 30.0),
+                            egui::Align2::LEFT_TOP,
+                            desc,
+                            egui::FontId::proportional(10.5),
+                            p.text_muted,
+                        );
+                    }
+                }
+
+                ui.add_space(4.0);
+                ui.separator();
+
+                // Options checkboxes
+                ui.checkbox(&mut self.pdf_include_patterns, "Include paper rulings, grid, and margin lines");
+                ui.checkbox(&mut self.pdf_force_light, "Force light paper background (Ink-saving print)");
+
+                ui.add_space(8.0);
+
+                // Footer row with Page Count and Action Buttons
+                ui.horizontal(|ui| {
+                    let page_count = self.notebook.pages.len();
+                    ui.label(
+                        egui::RichText::new(format!("{} page(s) • Ready", page_count))
+                            .size(11.0)
+                            .color(p.text_muted),
+                    );
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let export_btn = egui::Button::new(
+                            egui::RichText::new("Export PDF...").color(p.on_accent).strong(),
+                        )
+                        .fill(p.accent)
+                        .rounding(egui::Rounding::same(crate::theme::RADIUS_SM));
+
+                        if ui.add(export_btn).clicked() {
+                            trigger_export = true;
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            cancel_clicked = true;
+                        }
+                    });
+                });
+            });
+
+        if cancel_clicked {
+            is_open = false;
+        }
+        self.show_pdf_export_dialog = is_open;
+
+        if trigger_export {
+            self.show_pdf_export_dialog = false;
+            self.execute_export_pdf();
+        }
+    }
+
+    pub fn open_notebook_from_path(&mut self, path: &std::path::Path) -> Result<(), String> {
+        // Auto-save current file before switching if it was saved before
+        if let Some(ref cur_path) = self.current_file_path {
+            let _ = NotebookStorage::save(cur_path, &self.notebook);
+        }
+
+        let mut nb = NotebookStorage::load(path)?;
+        if self.is_dark_mode {
+            for page in &mut nb.pages {
+                for stroke in &mut page.strokes {
+                    let orig = stroke.original_color.unwrap_or(stroke.color);
+                    stroke.original_color = Some(orig);
+                    stroke.color = theme::adapt_color_to_dark(orig);
+                }
+            }
+        } else {
+            for page in &mut nb.pages {
+                for stroke in &mut page.strokes {
+                    if let Some(orig) = stroke.original_color.take() {
+                        stroke.color = orig;
+                    }
+                }
+            }
+        }
+        self.notebook = nb;
+        self.current_file_path = Some(path.to_path_buf());
+        self.clear_selection();
+        self.set_status(&format!(
+            "Opened '{}' 📚",
+            path.file_stem().and_then(|s| s.to_str()).unwrap_or("notebook")
+        ));
+        self.library.scan(self.current_file_path.as_deref());
+        Ok(())
+    }
+
+    fn handle_library_action(&mut self, action: crate::library::LibraryAction) {
+        match action {
+            crate::library::LibraryAction::Open(path) => {
+                if let Err(e) = self.open_notebook_from_path(&path) {
+                    self.set_error(&format!("Failed to open notebook: {}", e));
+                } else {
+                    self.library.is_open = false;
+                }
+            }
+            crate::library::LibraryAction::CreateNew { title, paper_type } => {
+                // Auto-save current
+                if let Some(ref cur_path) = self.current_file_path {
+                    let _ = NotebookStorage::save(cur_path, &self.notebook);
+                }
+
+                let safe_title = if title.trim().is_empty() {
+                    "Untitled Notebook".to_string()
+                } else {
+                    title.trim().to_string()
+                };
+
+                let mut new_nb = crate::model::Notebook::new_with_paper(&safe_title, paper_type);
+                new_nb.title = safe_title.clone();
+
+                let file_name = format!("{}.handnote", safe_title.replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], "_"));
+                let target_path = self.library.library_dir.join(file_name);
+
+                if let Err(e) = NotebookStorage::save(&target_path, &new_nb) {
+                    self.set_error(&format!("Failed to create notebook: {}", e));
+                } else {
+                    self.notebook = new_nb;
+                    self.current_file_path = Some(target_path.clone());
+                    self.clear_selection();
+                    self.library.scan(Some(&target_path));
+                    self.library.is_open = false;
+                    self.set_status(&format!("Created and opened '{}' ✨", safe_title));
+                }
+            }
+            crate::library::LibraryAction::Duplicate(path) => {
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Notebook");
+                let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("handnote");
+                let new_filename = format!("{} (Copy).{}", stem, ext);
+                let target_path = path.with_file_name(new_filename);
+
+                if let Err(e) = std::fs::copy(&path, &target_path) {
+                    self.set_error(&format!("Failed to duplicate: {}", e));
+                } else {
+                    self.library.scan(self.current_file_path.as_deref());
+                    self.set_status("Notebook duplicated 📑");
+                }
+            }
+            crate::library::LibraryAction::Rename { path, new_title } => {
+                let clean_title = new_title.trim();
+                if clean_title.is_empty() {
+                    return;
+                }
+                let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("handnote");
+                let safe_filename = format!("{}.{}", clean_title.replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], "_"), ext);
+                let new_path = path.with_file_name(safe_filename);
+
+                if let Err(e) = std::fs::rename(&path, &new_path) {
+                    self.set_error(&format!("Failed to rename: {}", e));
+                } else {
+                    if let Ok(mut nb) = NotebookStorage::load(&new_path) {
+                        nb.title = clean_title.to_string();
+                        let _ = NotebookStorage::save(&new_path, &nb);
+                    }
+                    if self.current_file_path.as_deref() == Some(&path) {
+                        self.current_file_path = Some(new_path);
+                        self.notebook.title = clean_title.to_string();
+                    }
+                    self.library.scan(self.current_file_path.as_deref());
+                    self.set_status(&format!("Renamed to '{}' ✏️", clean_title));
+                }
+            }
+            crate::library::LibraryAction::Delete(path) => {
+                let is_current = self.current_file_path.as_deref() == Some(&path);
+                if let Err(e) = std::fs::remove_file(&path) {
+                    self.set_error(&format!("Failed to delete: {}", e));
+                } else {
+                    if is_current {
+                        self.notebook = crate::model::Notebook::new("Quick Notes");
+                        self.current_file_path = None;
+                        self.clear_selection();
+                    }
+                    self.library.scan(self.current_file_path.as_deref());
+                    self.set_status("Notebook deleted 🗑️");
+                }
+            }
+            crate::library::LibraryAction::ExportPdf(path) => {
+                if let Ok(nb) = NotebookStorage::load(&path) {
+                    let options = self.pdf_export_quality.to_options(self.pdf_include_patterns, self.pdf_force_light);
+                    let target_pdf = path.with_extension("pdf");
+                    match crate::pdf_export::PdfExporter::export_notebook(&nb, &options) {
+                        Ok(bytes) => {
+                            if let Err(e) = crate::pdf_export::PdfExporter::save_to_file(&bytes, &target_pdf) {
+                                self.set_error(&format!("Failed to save PDF: {}", e));
+                            } else {
+                                self.set_status(&format!("Exported PDF to '{}' 📄", target_pdf.display()));
+                            }
+                        }
+                        Err(e) => {
+                            self.set_error(&format!("PDF export failed: {}", e));
+                        }
+                    }
+                }
+            }
+            crate::library::LibraryAction::OpenFolderInExplorer => {
+                let _ = std::process::Command::new("explorer")
+                    .arg(&self.library.library_dir)
+                    .spawn();
+            }
+            crate::library::LibraryAction::ImportFile => {
+                self.prompt_open_file();
             }
         }
     }
@@ -1169,34 +2482,24 @@ impl InkkApp {
             .add_filter("Inkk Notebook (*.inkk, *.handnote)", &["inkk", "handnote"])
             .pick_file()
         {
-            match NotebookStorage::load(&path) {
-                Ok(mut nb) => {
-                    if self.is_dark_mode {
-                        for page in &mut nb.pages {
-                            for stroke in &mut page.strokes {
-                                let orig = stroke.original_color.unwrap_or(stroke.color);
-                                stroke.original_color = Some(orig);
-                                stroke.color = theme::adapt_color_to_dark(orig);
-                            }
-                        }
-                    } else {
-                        for page in &mut nb.pages {
-                            for stroke in &mut page.strokes {
-                                if let Some(orig) = stroke.original_color.take() {
-                                    stroke.color = orig;
-                                }
-                            }
-                        }
-                    }
-                    self.notebook = nb;
-                    self.current_file_path = Some(path);
-                    self.clear_selection();
-                    self.set_status("Notebook opened");
-                }
-                Err(e) => {
-                    self.set_error(&format!("Open failed: {}", e));
-                }
+            if let Err(e) = self.open_notebook_from_path(&path) {
+                self.set_error(&format!("Open failed: {}", e));
             }
+        }
+    }
+
+    pub fn recover_last_session(&mut self) {
+        if let Some((recovered_nb, orig_path, meta)) = crate::autosave::AutosaveManager::check_recovery_available() {
+            let title = meta.notebook_title.clone();
+            let pages = meta.page_count;
+            let strokes = meta.stroke_count;
+            self.notebook = recovered_nb;
+            self.current_file_path = orig_path;
+            self.last_total_strokes = strokes;
+            self.autosave.recovery_restored_banner = Some(meta);
+            self.set_status(&format!("Recovered session '{}' ({} pages, {} strokes) 💾", title, pages, strokes));
+        } else {
+            self.set_status("No uncommitted recovery session found.");
         }
     }
 
@@ -1204,22 +2507,12 @@ impl InkkApp {
 
     fn erase_stroke_at(&mut self, world_pos: Pos2, radius: f32) {
         let page = self.notebook.current_page_mut();
-        page.strokes.retain(|stroke| !stroke_hit_test(stroke, world_pos, radius));
-        // Erase plot if eraser touches any part of its card
-        page.plots.retain(|p| {
-            let card_rect = Rect::from_min_size(Pos2::new(p.x, p.y), Vec2::new(p.width, p.height));
-            !card_rect.expand(radius).contains(world_pos)
-        });
-        // Erase matrix if eraser touches any part of its card
-        page.matrices.retain(|m| {
-            let card_rect = Rect::from_min_size(Pos2::new(m.x, m.y), Vec2::new(m.width, m.height));
-            !card_rect.expand(radius).contains(world_pos)
-        });
-        // Erase grid if eraser touches any part of its grid
-        page.grids.retain(|g| {
-            let grid_rect = Rect::from_min_size(Pos2::new(g.x, g.y), Vec2::new(g.total_width(), g.total_height()));
-            !grid_rect.expand(radius).contains(world_pos)
-        });
+        let old_len = page.strokes.len();
+        page.strokes
+            .retain(|stroke| !stroke_hit_test(stroke, world_pos, radius));
+        if page.strokes.len() != old_len {
+            self.autosave.mark_dirty();
+        }
     }
 
     fn erase_point_at(&mut self, world_pos: Pos2, radius: f32) {
@@ -1249,121 +2542,271 @@ impl InkkApp {
 
             for seg in sub_segments {
                 let mut s = stroke.clone();
-                s.id = format!("stroke_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+                s.id = format!(
+                    "stroke_{}",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis()
+                );
                 s.points = seg;
                 new_strokes.push(s);
             }
         }
 
         page.strokes = new_strokes;
+        self.autosave.mark_dirty();
     }
 }
 
 impl InkkApp {
     fn handle_shortcuts(&mut self, ctx: &egui::Context, available_size: Vec2) {
-        // Don't steal keys while the user is typing (e.g. the notebook title).
-        if ctx.wants_keyboard_input() {
-            return;
-        }
         use egui::{Key, Modifiers};
         let pressed = |m: Modifiers, k: Key| ctx.input_mut(|i| i.consume_key(m, k));
 
-        if pressed(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z) || pressed(Modifiers::COMMAND, Key::Y) {
-            self.redo();
+        // Prioritize Paste: If user presses Ctrl+V and is not editing a text box, paste image/file immediately!
+        let ctrl_v = pressed(Modifiers::COMMAND, Key::V)
+            || pressed(Modifiers::CTRL, Key::V)
+            || ctx.input(|i| (i.modifiers.ctrl || i.modifiers.command) && i.key_pressed(Key::V));
+        if ctrl_v && self.editing_text_id.is_none() {
+            self.paste_from_clipboard();
+            return;
         }
-        if pressed(Modifiers::COMMAND, Key::Z) {
+
+        // Don't steal keys while the user is actively typing in a text widget.
+        if ctx.wants_keyboard_input() {
+            return;
+        }
+
+        // Mouse function buttons: Side buttons (Extra1 = Back / Undo, Extra2 = Forward / Redo)
+        let (extra1, extra2, middle_clicked) = ctx.input(|i| {
+            (
+                i.pointer.button_clicked(egui::PointerButton::Extra1),
+                i.pointer.button_clicked(egui::PointerButton::Extra2),
+                i.pointer.button_clicked(egui::PointerButton::Middle),
+            )
+        });
+        if extra1 {
             self.undo();
         }
-        if pressed(Modifiers::COMMAND, Key::S) {
+        if extra2 {
+            self.redo();
+        }
+        if middle_clicked {
+            self.scale = 1.0;
+            self.set_status("Scale: 100% 🔍 (Middle click)");
+        }
+
+        if pressed(Modifiers::NONE, Key::F1)
+            || self.shortcut_manager.is_triggered(ctx, "shortcuts_dialog")
+        {
+            self.shortcuts_dialog.open();
+        }
+
+        if self.shortcut_manager.is_triggered(ctx, "edit_redo")
+            || pressed(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z)
+            || pressed(Modifiers::COMMAND, Key::Y)
+        {
+            self.redo();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "edit_undo")
+            || pressed(Modifiers::COMMAND, Key::Z)
+        {
+            self.undo();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "file_save")
+            || pressed(Modifiers::COMMAND, Key::S)
+        {
             self.prompt_save_file();
         }
-        if pressed(Modifiers::COMMAND, Key::O) {
+        if self.shortcut_manager.is_triggered(ctx, "file_open")
+            || pressed(Modifiers::COMMAND, Key::O)
+        {
             self.prompt_open_file();
+        }
+        if self.shortcut_manager.is_triggered(ctx, "file_library")
+            || pressed(Modifiers::COMMAND, Key::L)
+        {
+            if self.library.is_open {
+                self.library.is_open = false;
+            } else {
+                self.library.open(self.current_file_path.as_deref());
+            }
+        }
+        if self.shortcut_manager.is_triggered(ctx, "file_export_pdf")
+            || pressed(Modifiers::COMMAND | Modifiers::SHIFT, Key::E)
+        {
+            self.prompt_export_pdf();
         }
         if pressed(Modifiers::COMMAND, Key::V) {
             self.paste_from_clipboard();
         }
-        if pressed(Modifiers::COMMAND, Key::Num0) {
+        if self.shortcut_manager.is_triggered(ctx, "canvas_reset_zoom")
+            || pressed(Modifiers::COMMAND, Key::Num0)
+        {
             self.zoom_by(1.0 / self.scale, available_size);
         }
-        if pressed(Modifiers::NONE, Key::Delete) || pressed(Modifiers::NONE, Key::Backspace) {
+        if self.shortcut_manager.is_triggered(ctx, "edit_delete")
+            || pressed(Modifiers::NONE, Key::Delete)
+            || pressed(Modifiers::NONE, Key::Backspace)
+        {
             self.delete_selected();
         }
         if pressed(Modifiers::NONE, Key::Escape) {
             self.clear_selection();
             self.editing_text_id = None;
-            self.notebook.current_page_mut().text_boxes.retain(|b| !b.text.trim().is_empty());
+            self.notebook
+                .current_page_mut()
+                .text_boxes
+                .retain(|b| !b.text.trim().is_empty());
         }
-        if pressed(Modifiers::NONE, Key::PageDown) {
+        if self.shortcut_manager.is_triggered(ctx, "nav_next_page")
+            || pressed(Modifiers::NONE, Key::PageDown)
+        {
             self.notebook.next_page();
             self.clear_selection();
         }
-        if pressed(Modifiers::NONE, Key::PageUp) {
+        if self.shortcut_manager.is_triggered(ctx, "nav_prev_page")
+            || pressed(Modifiers::NONE, Key::PageUp)
+        {
             self.notebook.prev_page();
             self.clear_selection();
         }
-        if pressed(Modifiers::NONE, Key::OpenBracket) {
+        if self.shortcut_manager.is_triggered(ctx, "tool_brush_smaller")
+            || pressed(Modifiers::NONE, Key::OpenBracket)
+        {
             self.size = (self.size - 1.0).max(1.0);
         }
-        if pressed(Modifiers::NONE, Key::CloseBracket) {
+        if self.shortcut_manager.is_triggered(ctx, "tool_brush_bigger")
+            || pressed(Modifiers::NONE, Key::CloseBracket)
+        {
             self.size = (self.size + 1.0).min(30.0);
         }
 
-        if pressed(Modifiers::NONE, Key::T) {
+        if self.shortcut_manager.is_triggered(ctx, "tool_pen") || pressed(Modifiers::NONE, Key::Num1) {
+            self.set_tool(ToolMode::Pen);
+        }
+        if self.shortcut_manager.is_triggered(ctx, "tool_highlighter") || pressed(Modifiers::NONE, Key::Num2) {
+            self.set_tool(ToolMode::Highlighter);
+        }
+        if self.shortcut_manager.is_triggered(ctx, "tool_shape") || pressed(Modifiers::NONE, Key::Num3) {
+            self.set_tool(ToolMode::Shape(self.current_shape));
+        }
+        if self.shortcut_manager.is_triggered(ctx, "tool_text")
+            || pressed(Modifiers::NONE, Key::Num4)
+            || pressed(Modifiers::NONE, Key::T)
+        {
             self.set_tool(ToolMode::Text);
         }
-
-        // Number keys pick tools, matching the toolbar order
-        let tool_keys = [
-            (Key::Num1, ToolMode::Pen),
-            (Key::Num2, ToolMode::Highlighter),
-            (Key::Num3, ToolMode::Shape(self.current_shape)),
-            (Key::Num4, ToolMode::Text),
-            (Key::Num5, ToolMode::EraserStroke),
-            (Key::Num6, ToolMode::EraserPoint),
-            (Key::Num7, ToolMode::LassoSelect),
-            (Key::Num8, ToolMode::Pan),
-        ];
-        for (key, mode) in tool_keys {
-            if pressed(Modifiers::NONE, key) {
-                self.set_tool(mode);
-            }
+        if self.shortcut_manager.is_triggered(ctx, "tool_eraser_stroke") || pressed(Modifiers::NONE, Key::Num5) {
+            self.set_tool(ToolMode::EraserStroke);
+        }
+        if self.shortcut_manager.is_triggered(ctx, "tool_eraser_point") || pressed(Modifiers::NONE, Key::Num6) {
+            self.set_tool(ToolMode::EraserPoint);
+        }
+        if self.shortcut_manager.is_triggered(ctx, "tool_lasso")
+            || pressed(Modifiers::NONE, Key::Num7)
+            || pressed(Modifiers::NONE, Key::L)
+        {
+            self.set_tool(ToolMode::LassoSelect);
+        }
+        if self.shortcut_manager.is_triggered(ctx, "tool_pan") || pressed(Modifiers::NONE, Key::Num8) {
+            self.set_tool(ToolMode::Pan);
         }
 
-        if pressed(Modifiers::SHIFT, Key::R) {
+        if self.shortcut_manager.is_triggered(ctx, "instrument_protractor") || pressed(Modifiers::SHIFT, Key::R) {
             self.ruler.toggle_protractor();
             let is_on = self.ruler.kind == RulerKind::Protractor;
-            self.set_status(if is_on { "Protractor ON 📐 (drag body to move, dial to rotate)" } else { "Protractor OFF" });
-        } else if pressed(Modifiers::NONE, Key::R) {
+            self.set_status(if is_on {
+                "Protractor ON 📐 (drag body to move, dial to rotate)"
+            } else {
+                "Protractor OFF"
+            });
+        } else if self.shortcut_manager.is_triggered(ctx, "instrument_ruler") || pressed(Modifiers::NONE, Key::R) {
             self.ruler.toggle_ruler();
             let is_on = self.ruler.kind == RulerKind::Ruler;
-            self.set_status(if is_on { "Straight Ruler ON 📏 (drag body to move, dial to rotate)" } else { "Ruler OFF" });
+            self.set_status(if is_on {
+                "Straight Ruler ON 📏 (drag body to move, dial to rotate)"
+            } else {
+                "Ruler OFF"
+            });
         }
 
-        if self.editing_text_id.is_none() && (pressed(Modifiers::NONE, Key::M) || pressed(Modifiers::COMMAND, Key::M)) {
+        let ctrl_m = pressed(Modifiers::COMMAND, Key::M);
+        let plain_m = pressed(Modifiers::NONE, Key::M)
+            && !ctx.wants_keyboard_input()
+            && self.editing_text_id.is_none();
+        if self.shortcut_manager.is_triggered(ctx, "studio_math") || ctrl_m || plain_m {
             self.math_studio.toggle();
             let is_on = self.math_studio.is_open;
-            self.set_status(if is_on { "Math Studio OPEN 🔬 [MATLAB Engine Ready]" } else { "Math Studio CLOSED" });
+            self.set_status(if is_on {
+                "Math Studio OPEN [MATLAB Engine Ready]"
+            } else {
+                "Math Studio CLOSED"
+            });
         }
+
+        let ctrl_f = pressed(Modifiers::COMMAND, Key::F);
+        if self.shortcut_manager.is_triggered(ctx, "studio_flowchart") || ctrl_f {
+            self.flowchart_editor.toggle();
+            let is_on = self.flowchart_editor.is_open;
+            self.set_status(if is_on {
+                "Flowchart Studio OPEN"
+            } else {
+                "Flowchart Studio CLOSED"
+            });
+        }
+
+        // F11: Toggle Fullscreen
+        let f11_pressed = pressed(Modifiers::NONE, Key::F11)
+            || self.shortcut_manager.is_triggered(ctx, "view_fullscreen");
+        if f11_pressed {
+            self.toggle_fullscreen(ctx);
+        }
+    }
+
+    /// Toggle borderless full screen mode on or off
+    pub fn toggle_fullscreen(&mut self, ctx: &egui::Context) {
+        let current = ctx.input(|i| i.viewport().fullscreen).unwrap_or(self.is_fullscreen);
+        self.is_fullscreen = !current;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.is_fullscreen));
+        self.set_status(if self.is_fullscreen {
+            "Fullscreen Mode ON (Press F11 to exit)"
+        } else {
+            "Fullscreen Mode OFF"
+        });
     }
 
     /// Floating toast for status / error messages, fading out over `theme::TOAST_SECS`.
     fn render_toast(&self, ctx: &egui::Context, canvas_rect: Rect) {
-        let Some((msg, at, is_error)) = &self.status_message else { return };
+        let Some((msg, at, is_error)) = &self.status_message else {
+            return;
+        };
         let t = at.elapsed().as_secs_f32();
-        let total = if *is_error { theme::TOAST_SECS * 2.0 } else { theme::TOAST_SECS };
+        let total = if *is_error {
+            theme::TOAST_SECS * 2.0
+        } else {
+            theme::TOAST_SECS
+        };
         if t >= total {
             return;
         }
         let alpha = ((total - t) / 0.4).clamp(0.0, 1.0);
         let p = self.palette();
-        let (icon, color) = if *is_error { (theme::icon::WARN, p.danger) } else { (theme::icon::CHECK, p.success) };
+        let (icon, color) = if *is_error {
+            (theme::icon::WARN, p.danger)
+        } else {
+            (theme::icon::CHECK, p.success)
+        };
 
         egui::Area::new(egui::Id::new("toast"))
             .order(egui::Order::Tooltip)
             .interactable(false)
             .pivot(egui::Align2::CENTER_BOTTOM)
-            .fixed_pos(Pos2::new(canvas_rect.center().x, canvas_rect.bottom() - 16.0))
+            .fixed_pos(Pos2::new(
+                canvas_rect.center().x,
+                canvas_rect.bottom() - 16.0,
+            ))
             .show(ctx, |ui| {
                 ui.set_opacity(alpha);
                 egui::Frame::popup(ui.style())
@@ -1384,34 +2827,67 @@ impl InkkApp {
         let p = self.palette();
         match self.tool {
             ToolMode::Pen | ToolMode::Highlighter => {
-                let mul = if self.tool == ToolMode::Highlighter { 2.5 } else { 0.5 };
+                let mul = if self.tool == ToolMode::Highlighter {
+                    2.5
+                } else {
+                    0.5
+                };
                 let r = (self.size * mul * self.scale).max(1.5);
-                painter.circle_stroke(cursor, r + 1.0, Stroke::new(1.0_f32, p.text_muted.gamma_multiply(0.7)));
+                painter.circle_stroke(
+                    cursor,
+                    r + 1.0,
+                    Stroke::new(1.0_f32, p.text_muted.gamma_multiply(0.7)),
+                );
                 ctx.set_cursor_icon(egui::CursorIcon::Crosshair);
             }
             ToolMode::EraserStroke | ToolMode::EraserPoint => {
                 // Matches the world-space radius used by erase_*_at (scale cancels out on screen)
-                let r = if self.tool == ToolMode::EraserStroke { self.size * 5.0 } else { self.size * 3.5 };
-                painter.circle(cursor, r, p.danger.gamma_multiply(0.08), Stroke::new(1.2_f32, p.danger.gamma_multiply(0.8)));
+                let r = if self.tool == ToolMode::EraserStroke {
+                    self.size * 5.0
+                } else {
+                    self.size * 3.5
+                };
+                painter.circle(
+                    cursor,
+                    r,
+                    p.danger.gamma_multiply(0.08),
+                    Stroke::new(1.2_f32, p.danger.gamma_multiply(0.8)),
+                );
                 ctx.set_cursor_icon(egui::CursorIcon::None);
             }
             ToolMode::Shape(_) => ctx.set_cursor_icon(egui::CursorIcon::Crosshair),
             ToolMode::LassoSelect => {
                 let mut cursor_set = false;
                 if let Some(bounds) = self.get_selection_bounds() {
-                    let sb = Rect::from_min_max(self.to_screen(bounds.min), self.to_screen(bounds.max)).expand(8.0);
-                    if let Some(handle) = hit_handle(cursor, sb, 8.0) {
+                    let sb =
+                        Rect::from_min_max(self.to_screen(bounds.min), self.to_screen(bounds.max))
+                            .expand(8.0);
+                    if let Some(handle) = hit_handle(cursor, sb, 16.0) {
                         let icon = match handle {
-                            SelectionHandle::TopLeft | SelectionHandle::BottomRight => egui::CursorIcon::ResizeNwSe,
-                            SelectionHandle::TopRight | SelectionHandle::BottomLeft => egui::CursorIcon::ResizeNeSw,
-                            SelectionHandle::Top | SelectionHandle::Bottom => egui::CursorIcon::ResizeNorth,
-                            SelectionHandle::Left | SelectionHandle::Right => egui::CursorIcon::ResizeEast,
+                            SelectionHandle::TopLeft | SelectionHandle::BottomRight => {
+                                egui::CursorIcon::ResizeNwSe
+                            }
+                            SelectionHandle::TopRight | SelectionHandle::BottomLeft => {
+                                egui::CursorIcon::ResizeNeSw
+                            }
+                            SelectionHandle::Top | SelectionHandle::Bottom => {
+                                egui::CursorIcon::ResizeNorth
+                            }
+                            SelectionHandle::Left | SelectionHandle::Right => {
+                                egui::CursorIcon::ResizeEast
+                            }
                         };
                         ctx.set_cursor_icon(icon);
                         cursor_set = true;
-                    } else if sb.contains(cursor) {
-                        ctx.set_cursor_icon(egui::CursorIcon::Move);
-                        cursor_set = true;
+                    } else {
+                        let move_bar_rect = Rect::from_min_max(
+                            Pos2::new(sb.left() - 8.0, sb.top() - 38.0),
+                            Pos2::new(sb.right().max(sb.left() + 280.0) + 8.0, sb.top() + 6.0),
+                        );
+                        if sb.expand(16.0).contains(cursor) || move_bar_rect.contains(cursor) {
+                            ctx.set_cursor_icon(egui::CursorIcon::Move);
+                            cursor_set = true;
+                        }
                     }
                 }
                 if !cursor_set {
@@ -1421,7 +2897,11 @@ impl InkkApp {
             ToolMode::Text => ctx.set_cursor_icon(egui::CursorIcon::Text),
             ToolMode::Pan => {
                 let grabbing = ctx.input(|i| i.pointer.primary_down());
-                ctx.set_cursor_icon(if grabbing { egui::CursorIcon::Grabbing } else { egui::CursorIcon::Grab });
+                ctx.set_cursor_icon(if grabbing {
+                    egui::CursorIcon::Grabbing
+                } else {
+                    egui::CursorIcon::Grab
+                });
             }
         }
     }
@@ -1432,23 +2912,216 @@ impl eframe::App for InkkApp {
         let p = self.palette();
         let available_size = ctx.screen_rect().size();
 
+        // Drag-and-drop of image files from Windows Explorer onto the window
+        let dropped = ctx.input(|i| i.raw.dropped_files.clone());
+        if !dropped.is_empty() {
+            let mut count = 0;
+            for file in dropped {
+                if let Some(path) = file.path {
+                    if let Ok(bytes) = std::fs::read(&path) {
+                        if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(&bytes) {
+                            self.insert_image_bytes(img_bytes, w, h);
+                            count += 1;
+                        }
+                    }
+                } else if let Some(bytes) = file.bytes {
+                    if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(&bytes) {
+                        self.insert_image_bytes(img_bytes, w, h);
+                        count += 1;
+                    }
+                }
+            }
+            if count > 0 {
+                self.set_status(&format!("Inserted {} dropped image(s)! 🖼", count));
+            }
+        }
+
+        // Track stroke changes to ensure dirty state is maintained
+        let cur_strokes: usize = self.notebook.pages.iter().map(|p| p.strokes.len()).sum();
+        if cur_strokes != self.last_total_strokes {
+            self.autosave.mark_dirty();
+            self.last_total_strokes = cur_strokes;
+        }
+
+        // Periodic background autosave check
+        if self.autosave.should_autosave() {
+            if let Err(e) = self.autosave.save_recovery(&self.notebook, self.current_file_path.as_deref()) {
+                eprintln!("Autosave snapshot failed: {}", e);
+            }
+        }
+
+        // Keep wake-up timer active if dirty and autosave is enabled
+        if self.autosave.enabled && self.autosave.is_dirty {
+            let elapsed = self.autosave.last_autosave_time.elapsed().as_secs();
+            let remaining = self.autosave.interval.as_secs().saturating_sub(elapsed);
+            ctx.request_repaint_after(std::time::Duration::from_secs(remaining.max(1)));
+        }
+
+        // Crash Recovery Notice Banner (only shown when splash screen is not active to prevent duplicate notification)
+        let mut dismiss_recovery_banner = false;
+        let mut save_as_from_recovery = false;
+        if !self.splash_screen.is_active {
+            if let Some(ref meta) = self.autosave.recovery_restored_banner {
+                egui::TopBottomPanel::top("crash_recovery_banner")
+                    .frame(
+                        egui::Frame::side_top_panel(&ctx.style())
+                            .fill(if self.is_dark_mode {
+                                Color32::from_rgb(0x28, 0x22, 0x1E)
+                            } else {
+                                Color32::from_rgb(0xF5, 0xEF, 0xE6)
+                            })
+                            .inner_margin(egui::Margin::symmetric(14.0, 7.0))
+                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(0xB5, 0x41, 0x2E))),
+                    )
+                    .show(ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new("⚡ Crash Recovery Active:")
+                                    .font(theme::font_serif(13.0))
+                                    .strong()
+                                    .color(Color32::from_rgb(0xB5, 0x41, 0x2E)),
+                            );
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "Restored uncommitted session '{}' from {} ({} pages, {} strokes). All work safe!",
+                                    meta.notebook_title, meta.time_str, meta.page_count, meta.stroke_count
+                                ))
+                                .color(p.text)
+                                .size(11.5),
+                            );
+
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui
+                                    .button(
+                                        egui::RichText::new("Dismiss")
+                                            .size(11.0)
+                                            .color(p.text_muted),
+                                    )
+                                    .clicked()
+                                {
+                                    dismiss_recovery_banner = true;
+                                }
+                                if ui
+                                    .button(
+                                        egui::RichText::new("Save As...")
+                                            .size(11.0)
+                                            .color(p.accent)
+                                            .strong(),
+                                    )
+                                    .clicked()
+                                {
+                                    save_as_from_recovery = true;
+                                }
+                            });
+                        });
+                    });
+            }
+        }
+        if dismiss_recovery_banner {
+            self.autosave.recovery_restored_banner = None;
+        }
+        if save_as_from_recovery {
+            self.prompt_save_as_file();
+            self.autosave.recovery_restored_banner = None;
+        }
+
         let bar_frame = egui::Frame::side_top_panel(&ctx.style())
             .fill(p.surface)
             .inner_margin(egui::Margin::symmetric(10.0, 6.0))
             .stroke(Stroke::new(1.0_f32, p.border));
 
-        egui::TopBottomPanel::top("top_panel").frame(bar_frame).show(ctx, |ui| {
-            self.render_top_toolbar(ui, ctx);
-        });
-        egui::TopBottomPanel::top("context_bar")
-            .frame(bar_frame.fill(p.surface_alt).inner_margin(egui::Margin::symmetric(12.0, 4.0)))
+        egui::TopBottomPanel::top("top_panel")
+            .frame(bar_frame)
             .show(ctx, |ui| {
-                self.render_context_bar(ui);
+                self.render_top_toolbar(ui, ctx);
             });
-        egui::TopBottomPanel::bottom("bottom_panel").frame(bar_frame).show(ctx, |ui| {
-            self.render_bottom_bar(ui, available_size);
-        });
-        self.math_studio.render_panel(ctx, self.notebook.current_page_mut(), &p, self.is_dark_mode);
+        if matches!(
+            self.tool,
+            ToolMode::Pen | ToolMode::Shape(_) | ToolMode::Text
+        ) {
+            egui::TopBottomPanel::top("context_bar")
+                .frame(
+                    bar_frame
+                        .fill(p.surface_alt)
+                        .inner_margin(egui::Margin::symmetric(12.0, 4.0)),
+                )
+                .show(ctx, |ui| {
+                    self.render_context_bar(ui);
+                });
+        }
+        egui::TopBottomPanel::bottom("bottom_panel")
+            .frame(bar_frame)
+            .show(ctx, |ui| {
+                self.render_bottom_bar(ui, available_size);
+            });
+        self.math_studio
+            .render_panel(ctx, self.notebook.current_page_mut(), &p, self.is_dark_mode);
+
+        if self.math_studio.req_open_matrix_dialog {
+            self.math_studio.req_open_matrix_dialog = false;
+            self.matrix_dialog.open_new();
+        }
+        if self.math_studio.req_open_axes_dialog {
+            self.math_studio.req_open_axes_dialog = false;
+            self.axes_dialog.open_new();
+        }
+        if self.math_studio.req_open_table_dialog {
+            self.math_studio.req_open_table_dialog = false;
+            self.table_dialog.open_new();
+        }
+
+        self.matrix_dialog.render(
+            ctx,
+            self.notebook.current_page_mut(),
+            &mut self.math_studio.workspace,
+            &p,
+        );
+        self.axes_dialog.render(
+            ctx,
+            self.notebook.current_page_mut(),
+            &mut self.math_studio.workspace,
+            &p,
+        );
+        self.table_dialog
+            .render(ctx, self.notebook.current_page_mut(), &p);
+        self.flowchart_editor.render_window(
+            ctx,
+            &mut self.notebook.current_page_mut().flowcharts,
+            &p,
+            self.is_dark_mode,
+        );
+        self.render_pdf_export_dialog(ctx, &p);
+        self.autosave.render_dialog(ctx, &p, &self.notebook, self.current_file_path.as_deref());
+
+        if let Some(act) = self.library.render(ctx, &p, self.is_dark_mode, self.current_file_path.as_deref()) {
+            self.handle_library_action(act);
+        }
+
+        if let Some(svg) = self.flowchart_editor.req_bake_to_image.take() {
+            if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(svg.as_bytes()) {
+                self.insert_image_bytes(img_bytes, w, h);
+                self.set_status("Flowchart converted and placed on whiteboard as an image! 🖼");
+            } else {
+                self.set_error("Could not render flowchart SVG into image.");
+            }
+        }
+
+        if let Some(svg) = self.flowchart_editor.req_save_svg_file.take() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Scalable Vector Graphics (*.svg)", &["svg"])
+                .set_file_name("flowchart.svg")
+                .save_file()
+            {
+                if std::fs::write(&path, svg).is_ok() {
+                    self.set_status(&format!("Saved flowchart SVG to {}", path.display()));
+                } else {
+                    self.set_error("Failed to write SVG file.");
+                }
+            }
+        }
+
+
+
         self.render_previews_drawer(ctx);
 
         self.handle_shortcuts(ctx, available_size);
@@ -1457,6 +3130,7 @@ impl eframe::App for InkkApp {
             .frame(egui::Frame::none().fill(p.desk))
             .show(ctx, |ui| {
                 let canvas_rect = ui.available_rect_before_wrap();
+                self.onboarding_tour.rect_canvas = canvas_rect;
                 let response = ui.allocate_rect(canvas_rect, Sense::click_and_drag());
                 let painter = ui.painter_at(canvas_rect);
 
@@ -1514,6 +3188,52 @@ impl eframe::App for InkkApp {
                 let page_painter = painter.with_clip_rect(page_screen_rect);
                 let page = self.notebook.current_page();
 
+                // Empty state watermark: understated Inkk mascot + Georgia serif welcome
+                let is_page_empty = page.strokes.is_empty()
+                    && page.images.is_empty()
+                    && page.text_boxes.is_empty()
+                    && page.matrices.is_empty()
+                    && page.plots.is_empty()
+                    && page.grids.is_empty()
+                    && self.current_stroke.is_none();
+                if is_page_empty {
+                    let center = to_screen(Pos2::new(page_w * 0.5, (page_h * 0.38).min(380.0)));
+                    let body_col = if is_dark {
+                        Color32::from_rgba_unmultiplied(212, 98, 82, 50)
+                    } else {
+                        Color32::from_rgba_unmultiplied(185, 75, 60, 45)
+                    };
+                    let eye_col = if is_dark {
+                        Color32::from_rgba_unmultiplied(237, 230, 220, 60)
+                    } else {
+                        Color32::from_rgba_unmultiplied(32, 30, 27, 50)
+                    };
+                    let blush_col = if is_dark {
+                        Color32::from_rgba_unmultiplied(230, 140, 130, 70)
+                    } else {
+                        Color32::from_rgba_unmultiplied(235, 150, 140, 65)
+                    };
+                    widgets::draw_squid_mascot(&page_painter, center, 4.0 * scale.min(1.2), body_col, eye_col, blush_col);
+
+                    let title_pos = center + Vec2::new(0.0, 36.0 * scale.min(1.2));
+                    page_painter.text(
+                        title_pos,
+                        egui::Align2::CENTER_TOP,
+                        "Inkk",
+                        theme::font_serif(18.0 * scale.min(1.2)),
+                        p.text_muted.gamma_multiply(0.4),
+                    );
+
+                    let sub_pos = title_pos + Vec2::new(0.0, 24.0 * scale.min(1.2));
+                    page_painter.text(
+                        sub_pos,
+                        egui::Align2::CENTER_TOP,
+                        "Pick up your pen or tap to write",
+                        egui::FontId::proportional(12.5 * scale.min(1.2)),
+                        p.text_muted.gamma_multiply(0.3),
+                    );
+                }
+
                 // Layer 0: Image Layer (Scrble Ink PictureLayer)
                 for img in &page.images {
                     let tex_handle = self.image_textures.entry(img.id.clone()).or_insert_with(|| {
@@ -1554,6 +3274,20 @@ impl eframe::App for InkkApp {
                 // Layer 0.3: Matrix Entities
                 for matrix in &page.matrices {
                     MathRenderer::render_matrix(&page_painter, matrix, scale, &to_screen, &p, is_dark);
+                }
+
+                // Layer 0.4: Flowchart Entities
+                for flow in &page.flowcharts {
+                    let is_sel = self.selected_flowchart_ids.contains(&flow.id);
+                    crate::flowchart_ui::FlowchartRenderer::render(
+                        &page_painter,
+                        flow,
+                        scale,
+                        &to_screen,
+                        &p,
+                        is_dark,
+                        is_sel,
+                    );
                 }
 
                 // Layer 1: Highlighters (saved)
@@ -1654,10 +3388,10 @@ impl eframe::App for InkkApp {
                         let is_active = self.active_resize_handle == Some(handle);
                         let fill = if is_active { accent } else { p.surface };
                         let stroke_color = if is_active { p.on_accent } else { accent };
-                        painter.circle(h, 5.0, fill, Stroke::new(1.5_f32, stroke_color));
+                        painter.circle(h, 6.5, fill, Stroke::new(2.0_f32, stroke_color));
                     }
 
-                    // Pill badge above the selection
+                    // Move Bar Header above the selection
                     let total_count = self.selected_stroke_ids.len()
                         + self.selected_image_ids.len()
                         + self.selected_plot_ids.len()
@@ -1665,24 +3399,24 @@ impl eframe::App for InkkApp {
                         + self.selected_grid_ids.len();
                     let badge_text = if total_count == 1 {
                         if !self.selected_image_ids.is_empty() {
-                            "1 image selected · drag handles to resize · Del to delete".to_string()
+                            "✥ Move · Drag 8 corners to resize · Del: Delete".to_string()
                         } else if !self.selected_plot_ids.is_empty() {
-                            "1 plot graph selected · drag handles to resize · Del to delete".to_string()
+                            "✥ Plot · Drag to move · Del: Delete".to_string()
                         } else if !self.selected_matrix_ids.is_empty() {
-                            "1 matrix selected · drag handles to resize · Del to delete".to_string()
+                            "✥ Matrix · Drag to move · Del: Delete".to_string()
                         } else if !self.selected_grid_ids.is_empty() {
-                            "1 table grid selected · drag handles to resize · Del to delete".to_string()
+                            "✥ Table · Drag to move · Del: Delete".to_string()
                         } else {
-                            "1 stroke selected · drag to move/resize · Del to delete".to_string()
+                            "✥ Strokes · Drag to move · Del: Delete".to_string()
                         }
                     } else {
-                        format!("{} item(s) selected · drag to move/resize · Del to delete", total_count)
+                        format!("✥ {} selected items · Drag to move · Del: Delete", total_count)
                     };
                     let galley = painter.layout_no_wrap(badge_text, egui::FontId::proportional(12.0), p.on_accent);
                     let badge_min = Pos2::new(r.left(), (r.top() - galley.size().y - 14.0).max(canvas_rect.top() + 6.0));
-                    let badge_rect = Rect::from_min_size(badge_min, galley.size() + Vec2::new(16.0, 6.0));
-                    painter.rect_filled(badge_rect, 10.0, accent);
-                    painter.galley(badge_rect.min + Vec2::new(8.0, 3.0), galley, p.on_accent);
+                    let badge_rect = Rect::from_min_size(badge_min, galley.size() + Vec2::new(20.0, 8.0));
+                    painter.rect_filled(badge_rect, 6.0, accent);
+                    painter.galley(badge_rect.min + Vec2::new(10.0, 4.0), galley, p.on_accent);
                 }
 
                 // Stencil Overlay (Glassmorphic Ruler / Protractor)
@@ -1804,6 +3538,13 @@ impl eframe::App for InkkApp {
                 // so dragging toolbar sliders never inks, erases or pans.
                 if is_primary_pressed {
                     self.canvas_gesture = response.hovered();
+                    if self.canvas_gesture {
+                        // Auto-dismiss color and opacity popovers when user starts writing or touches the canvas
+                        ctx.data_mut(|d| {
+                            d.insert_temp(egui::Id::new("ink_palette_popover"), false);
+                            d.insert_temp(egui::Id::new("smart_opacity_custom_popup"), false);
+                        });
+                    }
                 } else if !pointer.primary_down() {
                     self.canvas_gesture = false;
                 }
@@ -1829,6 +3570,70 @@ impl eframe::App for InkkApp {
                     }
                 });
 
+                // 1. Right mouse button gestures (Quick move object/card or Pan canvas)
+                if pointer.secondary_pressed() && response.hovered() {
+                    if let Some(cursor) = pointer_pos {
+                        let world = self.to_world(cursor);
+                        self.secondary_drag_start = Some(cursor);
+
+                        let over_selection = self.get_selection_bounds().map(|b| b.expand(16.0 / self.scale).contains(world)).unwrap_or(false);
+                        let hit_card = self.hit_test_clickable_card(world);
+
+                        if over_selection {
+                            self.secondary_drag_is_item = true;
+                            self.is_dragging_selection = true;
+                            self.active_resize_handle = None;
+                            self.drag_last_pos_world = world;
+                            self.prepare_selection_drag();
+                        } else if let Some((kind, id)) = hit_card {
+                            self.clear_selection();
+                            match kind {
+                                "plot" => { self.selected_plot_ids.insert(id); }
+                                "matrix" => { self.selected_matrix_ids.insert(id); }
+                                "grid" => { self.selected_grid_ids.insert(id); }
+                                "flowchart" => { self.selected_flowchart_ids.insert(id); }
+                                "image" => { self.selected_image_ids.insert(id); }
+                                _ => {}
+                            }
+                            self.secondary_drag_is_item = true;
+                            self.is_dragging_selection = true;
+                            self.active_resize_handle = None;
+                            self.drag_last_pos_world = world;
+                            self.prepare_selection_drag();
+                        } else {
+                            self.secondary_drag_is_item = false;
+                        }
+                    }
+                }
+
+                if pointer.secondary_down() && self.secondary_drag_start.is_some() {
+                    if let Some(cursor) = pointer_pos {
+                        if self.secondary_drag_is_item && self.is_dragging_selection {
+                            let world = self.to_world(cursor);
+                            let delta = world - self.drag_last_pos_world;
+                            self.drag_last_pos_world = world;
+                            self.apply_selection_delta(delta);
+                            ctx.set_cursor_icon(egui::CursorIcon::Move);
+                        } else if !self.secondary_drag_is_item {
+                            self.pan += pointer.delta();
+                            ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+                        }
+                    }
+                }
+
+                if pointer.secondary_released() {
+                    if let Some(start_pos) = self.secondary_drag_start.take() {
+                        let end_pos = pointer_pos.unwrap_or(start_pos);
+                        let dist = start_pos.distance(end_pos);
+                        if self.secondary_drag_is_item {
+                            self.finish_selection_drag();
+                            if dist > 8.0 {
+                                self.set_status("Moved object ✥");
+                            }
+                        }
+                    }
+                }
+
                 // Middle mouse drag or Pan tool
                 if (self.tool == ToolMode::Pan && is_primary_down) || pointer.middle_down() {
                     self.pan += pointer.delta();
@@ -1837,44 +3642,57 @@ impl eframe::App for InkkApp {
                         let effective_cursor = self.ruler.snap_point(cursor).unwrap_or(cursor);
                         let world = self.to_world(effective_cursor);
 
-                        // Check if user clicked on the '✕' close button of any plot, matrix, or table grid
+                        // Check if user clicked on the '✕' close button or '✏' edit button of any plot, matrix, or table grid
                         let mut delete_plot_idx = None;
                         let mut delete_mat_idx = None;
                         let mut delete_grid_idx = None;
+                        let mut edit_plot_idx = None;
+                        let mut edit_mat_idx = None;
+                        let mut edit_grid_idx = None;
                         {
                             let page = self.notebook.current_page();
                             let scale = self.scale;
 
-                            // 1. Plot close button
+                            // 1. Plot close and edit button
                             for (idx, plot) in page.plots.iter().enumerate() {
                                 let card_min = self.to_screen(Pos2::new(plot.x, plot.y));
                                 let card_size = Vec2::new(plot.width * scale, plot.height * scale);
                                 let card_rect = Rect::from_min_size(card_min, card_size);
                                 let btn_size = (20.0 * scale).clamp(16.0, 24.0);
                                 let close_center = card_rect.right_top() + Vec2::new(-btn_size * 0.75, btn_size * 0.75);
+                                let edit_center = close_center - Vec2::new(btn_size * 1.05, 0.0);
                                 if cursor.distance(close_center) <= (btn_size * 0.85).max(16.0) {
                                     delete_plot_idx = Some(idx);
                                     break;
                                 }
+                                if cursor.distance(edit_center) <= (btn_size * 0.85).max(16.0) {
+                                    edit_plot_idx = Some(idx);
+                                    break;
+                                }
                             }
 
-                            // 2. Matrix close button
-                            if delete_plot_idx.is_none() {
+                            // 2. Matrix close and edit button
+                            if delete_plot_idx.is_none() && edit_plot_idx.is_none() {
                                 for (idx, mat) in page.matrices.iter().enumerate() {
                                     let card_min = self.to_screen(Pos2::new(mat.x, mat.y));
                                     let card_size = Vec2::new(mat.width * scale, mat.height * scale);
                                     let card_rect = Rect::from_min_size(card_min, card_size);
                                     let btn_size = (18.0 * scale).clamp(14.0, 22.0);
                                     let close_center = card_rect.right_top() + Vec2::new(-btn_size * 0.65, btn_size * 0.65);
+                                    let edit_center = close_center - Vec2::new(btn_size * 1.05, 0.0);
                                     if cursor.distance(close_center) <= (btn_size * 0.85).max(16.0) {
                                         delete_mat_idx = Some(idx);
+                                        break;
+                                    }
+                                    if cursor.distance(edit_center) <= (btn_size * 0.85).max(16.0) {
+                                        edit_mat_idx = Some(idx);
                                         break;
                                     }
                                 }
                             }
 
-                            // 3. Table grid close button
-                            if delete_plot_idx.is_none() && delete_mat_idx.is_none() {
+                            // 3. Table grid close and edit button
+                            if delete_plot_idx.is_none() && edit_plot_idx.is_none() && delete_mat_idx.is_none() && edit_mat_idx.is_none() {
                                 for (idx, grid) in page.grids.iter().enumerate() {
                                     let origin = self.to_screen(Pos2::new(grid.x, grid.y));
                                     let total_w = grid.col_width * grid.cols as f32 * scale;
@@ -1882,30 +3700,40 @@ impl eframe::App for InkkApp {
                                     let grid_rect = Rect::from_min_size(origin, Vec2::new(total_w, total_h));
                                     let btn_size = (18.0 * scale).clamp(14.0, 22.0);
                                     let close_center = grid_rect.right_top() + Vec2::new(-btn_size * 0.75, btn_size * 0.75);
+                                    let edit_center = close_center - Vec2::new(btn_size * 1.05, 0.0);
                                     if cursor.distance(close_center) <= (btn_size * 0.85).max(16.0) {
                                         delete_grid_idx = Some(idx);
+                                        break;
+                                    }
+                                    if cursor.distance(edit_center) <= (btn_size * 0.85).max(16.0) {
+                                        edit_grid_idx = Some(idx);
                                         break;
                                     }
                                 }
                             }
                         }
 
-                        let closed_any = if let Some(idx) = delete_plot_idx {
+                        if let Some(idx) = edit_plot_idx {
+                            let plot = self.notebook.current_page().plots[idx].clone();
+                            self.axes_dialog.open_edit(&plot);
+                        } else if let Some(idx) = edit_mat_idx {
+                            let mat = self.notebook.current_page().matrices[idx].clone();
+                            self.matrix_dialog.open_edit(&mat);
+                        } else if let Some(idx) = edit_grid_idx {
+                            let grid = self.notebook.current_page().grids[idx].clone();
+                            self.table_dialog.open_edit(&grid);
+                        } else if let Some(idx) = delete_plot_idx {
                             self.notebook.current_page_mut().plots.remove(idx);
-                            true
+                            self.clear_selection();
+                            self.set_status("Deleted plot 🗑");
                         } else if let Some(idx) = delete_mat_idx {
                             self.notebook.current_page_mut().matrices.remove(idx);
-                            true
+                            self.clear_selection();
+                            self.set_status("Deleted matrix 🗑");
                         } else if let Some(idx) = delete_grid_idx {
                             self.notebook.current_page_mut().grids.remove(idx);
-                            true
-                        } else {
-                            false
-                        };
-
-                        if closed_any {
                             self.clear_selection();
-                            self.set_status("Đã xoá mục toán học 🗑");
+                            self.set_status("Deleted table 🗑");
                         } else {
                             match self.tool {
                             ToolMode::Pan => {}
@@ -1923,7 +3751,7 @@ impl eframe::App for InkkApp {
                                 let mut hit_handle_opt = None;
                                 if let Some(wb) = self.get_selection_bounds() {
                                     let sb = Rect::from_min_max(self.to_screen(wb.min), self.to_screen(wb.max)).expand(8.0);
-                                    hit_handle_opt = hit_handle(cursor, sb, 9.0);
+                                    hit_handle_opt = hit_handle(cursor, sb, 16.0);
                                 }
 
                                 if let Some(handle) = hit_handle_opt {
@@ -1933,7 +3761,11 @@ impl eframe::App for InkkApp {
                                     self.prepare_selection_drag();
                                 } else if let Some(wb) = self.get_selection_bounds() {
                                     let sb = Rect::from_min_max(self.to_screen(wb.min), self.to_screen(wb.max)).expand(8.0);
-                                    if sb.contains(cursor) {
+                                    let move_bar_rect = Rect::from_min_max(
+                                        Pos2::new(sb.left() - 8.0, sb.top() - 38.0),
+                                        Pos2::new(sb.right().max(sb.left() + 280.0) + 8.0, sb.top() + 6.0),
+                                    );
+                                    if sb.expand(16.0).contains(cursor) || move_bar_rect.contains(cursor) || wb.expand(16.0 / self.scale).contains(world) {
                                         self.active_resize_handle = None;
                                         self.is_dragging_selection = true;
                                         self.drag_last_pos_world = world;
@@ -1944,6 +3776,7 @@ impl eframe::App for InkkApp {
                                             "plot" => { self.selected_plot_ids.insert(id); }
                                             "matrix" => { self.selected_matrix_ids.insert(id); }
                                             "grid" => { self.selected_grid_ids.insert(id); }
+                                            "flowchart" => { self.selected_flowchart_ids.insert(id); }
                                             "image" => { self.selected_image_ids.insert(id); }
                                             _ => {}
                                         }
@@ -1962,6 +3795,7 @@ impl eframe::App for InkkApp {
                                         "plot" => { self.selected_plot_ids.insert(id); }
                                         "matrix" => { self.selected_matrix_ids.insert(id); }
                                         "grid" => { self.selected_grid_ids.insert(id); }
+                                        "flowchart" => { self.selected_flowchart_ids.insert(id); }
                                         "image" => { self.selected_image_ids.insert(id); }
                                         _ => {}
                                     }
@@ -2255,43 +4089,20 @@ impl eframe::App for InkkApp {
                                                     grid.row_height = (new_h / (grid.rows.max(1) as f32)).max(10.0);
                                                 }
                                             }
+
+                                            for (id, orig_x, orig_y, orig_w, orig_h) in &self.initial_flowchart_rects {
+                                                if let Some(flow) = page.flowcharts.iter_mut().find(|f| f.id == *id) {
+                                                    flow.x = new_min.x + (orig_x - orig.min.x) * scale_x;
+                                                    flow.y = new_min.y + (orig_y - orig.min.y) * scale_y;
+                                                    flow.width = (orig_w * scale_x).max(80.0);
+                                                    flow.height = (orig_h * scale_y).max(60.0);
+                                                }
+                                            }
                                         }
                                     } else {
                                         let delta = world - self.drag_last_pos_world;
                                         self.drag_last_pos_world = world;
-                                        let page = self.notebook.current_page_mut();
-                                        for stroke in &mut page.strokes {
-                                            if self.selected_stroke_ids.contains(&stroke.id) {
-                                                for pt in &mut stroke.points {
-                                                    pt.x += delta.x;
-                                                    pt.y += delta.y;
-                                                }
-                                            }
-                                        }
-                                        for img in &mut page.images {
-                                            if self.selected_image_ids.contains(&img.id) {
-                                                img.x += delta.x;
-                                                img.y += delta.y;
-                                            }
-                                        }
-                                        for plot in &mut page.plots {
-                                            if self.selected_plot_ids.contains(&plot.id) {
-                                                plot.x += delta.x;
-                                                plot.y += delta.y;
-                                            }
-                                        }
-                                        for matrix in &mut page.matrices {
-                                            if self.selected_matrix_ids.contains(&matrix.id) {
-                                                matrix.x += delta.x;
-                                                matrix.y += delta.y;
-                                            }
-                                        }
-                                        for grid in &mut page.grids {
-                                            if self.selected_grid_ids.contains(&grid.id) {
-                                                grid.x += delta.x;
-                                                grid.y += delta.y;
-                                            }
-                                        }
+                                        self.apply_selection_delta(delta);
                                     }
                                 } else {
                                     if let Some(last) = self.lasso_points.last() {
@@ -2382,61 +4193,7 @@ impl eframe::App for InkkApp {
                     }
 
                     if self.is_dragging_selection {
-                        self.is_dragging_selection = false;
-                        self.active_resize_handle = None;
-                        self.initial_selection_rect = None;
-                        self.initial_stroke_points.clear();
-                        self.initial_image_rects.clear();
-                        self.initial_plot_rects.clear();
-                        self.initial_matrix_rects.clear();
-                        self.initial_grid_rects.clear();
-
-                        let page = self.notebook.current_page_mut();
-                        let mut max_y = 0.0f32;
-                        for stroke in &page.strokes {
-                            if self.selected_stroke_ids.contains(&stroke.id) {
-                                for pt in &stroke.points {
-                                    if pt.y > max_y {
-                                        max_y = pt.y;
-                                    }
-                                }
-                            }
-                        }
-                        for img in &page.images {
-                            if self.selected_image_ids.contains(&img.id) {
-                                let bottom = img.y + img.height;
-                                if bottom > max_y {
-                                    max_y = bottom;
-                                }
-                            }
-                        }
-                        for plot in &page.plots {
-                            if self.selected_plot_ids.contains(&plot.id) {
-                                let bottom = plot.y + plot.height;
-                                if bottom > max_y {
-                                    max_y = bottom;
-                                }
-                            }
-                        }
-                        for m in &page.matrices {
-                            if self.selected_matrix_ids.contains(&m.id) {
-                                let bottom = m.y + m.height;
-                                if bottom > max_y {
-                                    max_y = bottom;
-                                }
-                            }
-                        }
-                        for g in &page.grids {
-                            if self.selected_grid_ids.contains(&g.id) {
-                                let bottom = g.y + g.total_height();
-                                if bottom > max_y {
-                                    max_y = bottom;
-                                }
-                            }
-                        }
-                        if page.check_auto_expand(max_y) {
-                            self.set_status("Page auto-expanded! ♾️");
-                        }
+                        self.finish_selection_drag();
                     } else if !self.lasso_points.is_empty() {
                         if self.lasso_points.len() >= 3 {
                             let mut selected_strokes = HashSet::new();
@@ -2444,6 +4201,7 @@ impl eframe::App for InkkApp {
                             let mut selected_plots = HashSet::new();
                             let mut selected_matrices = HashSet::new();
                             let mut selected_grids = HashSet::new();
+                            let mut selected_flowcharts = HashSet::new();
                             let page = self.notebook.current_page();
                             for stroke in &page.strokes {
                                 if stroke.points.iter().any(|pt| point_in_polygon(Pos2::new(pt.x, pt.y), &self.lasso_points)) {
@@ -2494,12 +4252,24 @@ impl eframe::App for InkkApp {
                                     selected_grids.insert(g.id.clone());
                                 }
                             }
-                            let count = selected_strokes.len() + selected_images.len() + selected_plots.len() + selected_matrices.len() + selected_grids.len();
+                            for f in &page.flowcharts {
+                                let center = Pos2::new(f.x + f.width * 0.5, f.y + f.height * 0.5);
+                                let tl = Pos2::new(f.x, f.y);
+                                let br = Pos2::new(f.x + f.width, f.y + f.height);
+                                if point_in_polygon(center, &self.lasso_points)
+                                    || point_in_polygon(tl, &self.lasso_points)
+                                    || point_in_polygon(br, &self.lasso_points)
+                                {
+                                    selected_flowcharts.insert(f.id.clone());
+                                }
+                            }
+                            let count = selected_strokes.len() + selected_images.len() + selected_plots.len() + selected_matrices.len() + selected_grids.len() + selected_flowcharts.len();
                             self.selected_stroke_ids = selected_strokes;
                             self.selected_image_ids = selected_images;
                             self.selected_plot_ids = selected_plots;
                             self.selected_matrix_ids = selected_matrices;
                             self.selected_grid_ids = selected_grids;
+                            self.selected_flowchart_ids = selected_flowcharts;
                             if count > 0 {
                                 self.set_status(&format!("{} item(s) selected (drag handles to resize, drag body to move)", count));
                             }
@@ -2520,6 +4290,13 @@ impl eframe::App for InkkApp {
                                     "grid" => {
                                         self.selected_grid_ids.insert(id);
                                         self.set_status("Selected 1 table grid ▦ (drag handles to resize)");
+                                    }
+                                    "flowchart" => {
+                                        self.selected_flowchart_ids.insert(id.clone());
+                                        if let Some(flow) = self.notebook.current_page().flowcharts.iter().find(|f| f.id == id) {
+                                            self.flowchart_editor.open_for_entity(flow);
+                                        }
+                                        self.set_status("Selected 1 flowchart ⚡ (editing in Flowchart Studio)");
                                     }
                                     "image" => {
                                         self.selected_image_ids.insert(id);
@@ -2576,9 +4353,361 @@ impl eframe::App for InkkApp {
                                 self.set_status("Page auto-expanded! ♾️");
                             }
                             self.notebook.current_page_mut().strokes.push(stroke);
+                            self.autosave.mark_dirty();
                         }
                     }
                 }
+
+                // Right-Click Context Menu for quick access & mouse shortcuts
+                let mut action_paste = false;
+                let mut action_insert = false;
+                let mut action_delete = false;
+                let mut action_clear_sel = false;
+                let mut action_set_tool = None;
+                let mut action_toggle_math = false;
+                let mut action_toggle_ruler = false;
+                let mut action_toggle_protractor = false;
+                let mut action_open_matrix = false;
+                let mut action_open_axes = false;
+                let mut action_open_table = false;
+                let mut action_bake_flowchart = false;
+                let mut action_save_flowchart_svg = false;
+                let mut action_undo = false;
+                let mut action_redo = false;
+                let mut action_reset_zoom = false;
+
+                let has_selection = !self.selected_stroke_ids.is_empty()
+                    || !self.selected_image_ids.is_empty()
+                    || !self.selected_plot_ids.is_empty()
+                    || !self.selected_matrix_ids.is_empty()
+                    || !self.selected_grid_ids.is_empty();
+                let cur_tool = self.tool;
+                let is_math_open = self.math_studio.is_open;
+                let is_ruler_on = self.ruler.kind == RulerKind::Ruler;
+                let is_protractor_on = self.ruler.kind == RulerKind::Protractor;
+                let p = self.palette();
+
+                response.context_menu(|ui| {
+                    ui.set_min_width(220.0);
+
+                    ui.label(egui::RichText::new("⚙️ Quick Actions Menu").strong().color(p.accent));
+                    ui.separator();
+
+                    if ui.button("📋 Paste Image / SVG (Ctrl+V)").clicked() {
+                        action_paste = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("🖼 Insert Image from file...").clicked() {
+                        action_insert = true;
+                        ui.close_menu();
+                    }
+
+                    if has_selection {
+                        if ui.button("🗑 Delete selected (Del)").clicked() {
+                            action_delete = true;
+                            ui.close_menu();
+                        }
+                        if ui.button("✖ Deselect (Esc)").clicked() {
+                            action_clear_sel = true;
+                            ui.close_menu();
+                        }
+                    }
+
+                    if !self.selected_flowchart_ids.is_empty() {
+                        ui.separator();
+                        ui.label(egui::RichText::new("⚡ Flowchart Actions").small().color(p.accent));
+                        if ui.button("🖼 Convert Flowchart to Image on Board").clicked() {
+                            action_bake_flowchart = true;
+                            ui.close_menu();
+                        }
+                        if ui.button("💾 Save Flowchart as SVG file...").clicked() {
+                            action_save_flowchart_svg = true;
+                            ui.close_menu();
+                        }
+                    }
+
+                    ui.separator();
+                    ui.label(egui::RichText::new("Drawing Tools").small().color(p.text_muted));
+
+                    if ui.selectable_label(cur_tool == ToolMode::Pen, "🖊 Pen (1)").clicked() {
+                        action_set_tool = Some(ToolMode::Pen);
+                        ui.close_menu();
+                    }
+                    if ui.selectable_label(cur_tool == ToolMode::Highlighter, "🖍 Highlighter (2)").clicked() {
+                        action_set_tool = Some(ToolMode::Highlighter);
+                        ui.close_menu();
+                    }
+                    if ui.selectable_label(cur_tool == ToolMode::EraserStroke, "🧹 Stroke Eraser (5)").clicked() {
+                        action_set_tool = Some(ToolMode::EraserStroke);
+                        ui.close_menu();
+                    }
+                    if ui.selectable_label(cur_tool == ToolMode::LassoSelect, "✥ Select & Move (Lasso) (7 / L)").clicked() {
+                        action_set_tool = Some(ToolMode::LassoSelect);
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+                    ui.label(egui::RichText::new("Math & Tools").small().color(p.text_muted));
+
+                    let math_title = if is_math_open { "🔬 Close Math Studio" } else { "🔬 Open Math Studio (Ctrl+M)" };
+                    if ui.button(math_title).clicked() {
+                        action_toggle_math = true;
+                        ui.close_menu();
+                    }
+
+                    let ruler_title = if is_ruler_on { "📏 Hide Ruler" } else { "📏 Show Ruler (R)" };
+                    if ui.button(ruler_title).clicked() {
+                        action_toggle_ruler = true;
+                        ui.close_menu();
+                    }
+
+                    let protractor_title = if is_protractor_on { "📐 Hide Protractor" } else { "📐 Show Protractor (Shift+R)" };
+                    if ui.button(protractor_title).clicked() {
+                        action_toggle_protractor = true;
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Insert Matrix (Code / UI)...").clicked() {
+                        action_open_matrix = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("Insert Coordinate Axes (1D/2D/3D)...").clicked() {
+                        action_open_axes = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("Insert Data Table...").clicked() {
+                        action_open_table = true;
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+                    ui.label(egui::RichText::new("Mouse & Shortcuts").small().color(p.text_muted));
+
+                    if ui.button("↩ Undo (Mouse 4 / Ctrl+Z)").clicked() {
+                        action_undo = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("↪ Redo (Mouse 5 / Ctrl+Y)").clicked() {
+                        action_redo = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("🔍 100% Zoom (Ctrl+0 / Middle click)").clicked() {
+                        action_reset_zoom = true;
+                        ui.close_menu();
+                    }
+                    if ui.button("⌨ Keyboard Shortcuts (F1)...").clicked() {
+                        self.shortcuts_dialog.open();
+                        ui.close_menu();
+                    }
+                    if ui.button("✦ Quick Tour (Walkthrough)...").clicked() {
+                        self.onboarding_tour.start();
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+                    let fs_title = if self.is_fullscreen {
+                        "🗗 Exit Fullscreen (F11)"
+                    } else {
+                        "⛶ Fullscreen (F11)"
+                    };
+                    if ui.button(fs_title).clicked() {
+                        self.toggle_fullscreen(ctx);
+                        ui.close_menu();
+                    }
+                    if ui.button("🔄 Check for Updates...").clicked() {
+                        self.updater.open_dialog();
+                        ui.close_menu();
+                    }
+                });
+
+                if action_paste {
+                    self.paste_from_clipboard();
+                }
+                if action_insert {
+                    self.prompt_insert_image();
+                }
+                if action_delete {
+                    self.delete_selected();
+                }
+                if action_clear_sel {
+                    self.clear_selection();
+                }
+                if let Some(tool) = action_set_tool {
+                    self.set_tool(tool);
+                }
+                if action_toggle_math {
+                    self.math_studio.toggle();
+                }
+                if action_toggle_ruler {
+                    self.ruler.toggle_ruler();
+                }
+                if action_toggle_protractor {
+                    self.ruler.toggle_protractor();
+                }
+                if action_open_matrix {
+                    self.matrix_dialog.open_new();
+                }
+                if action_open_axes {
+                    self.axes_dialog.open_new();
+                }
+                if action_open_table {
+                    self.table_dialog.open_new();
+                }
+                if action_bake_flowchart {
+                    if let Some(fid) = self.selected_flowchart_ids.iter().next() {
+                        if let Some(flow) = self.notebook.current_page().flowcharts.iter().find(|f| f.id == *fid) {
+                            let graph = if let Some(g) = &flow.graph {
+                                g.clone()
+                            } else {
+                                let (ast, _) = crate::flowchart_core::parser::Parser::from_str(&flow.dsl_source).parse();
+                                crate::flowchart_core::ir::FlowchartGraph::from_ast(&ast)
+                            };
+                            let svg = crate::flowchart_core::export::FlowchartExporter::to_svg(&graph, None, None);
+                            if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(svg.as_bytes()) {
+                                self.insert_image_bytes(img_bytes, w, h);
+                                self.set_status("Flowchart converted and placed on whiteboard as an image! 🖼");
+                            } else {
+                                self.set_error("Could not render flowchart SVG into image.");
+                            }
+                        }
+                    }
+                }
+                if action_save_flowchart_svg {
+                    if let Some(fid) = self.selected_flowchart_ids.iter().next() {
+                        if let Some(flow) = self.notebook.current_page().flowcharts.iter().find(|f| f.id == *fid) {
+                            let graph = if let Some(g) = &flow.graph {
+                                g.clone()
+                            } else {
+                                let (ast, _) = crate::flowchart_core::parser::Parser::from_str(&flow.dsl_source).parse();
+                                crate::flowchart_core::ir::FlowchartGraph::from_ast(&ast)
+                            };
+                            let svg = crate::flowchart_core::export::FlowchartExporter::to_svg(&graph, None, None);
+                            if let Some(path) = rfd::FileDialog::new()
+                                .add_filter("Scalable Vector Graphics (*.svg)", &["svg"])
+                                .set_file_name("flowchart.svg")
+                                .save_file()
+                            {
+                                if std::fs::write(&path, svg).is_ok() {
+                                    self.set_status(&format!("Saved flowchart SVG to {}", path.display()));
+                                } else {
+                                    self.set_error("Failed to write SVG file.");
+                                }
+                            }
+                        }
+                    }
+                }
+                if action_undo {
+                    self.undo();
+                }
+                if action_redo {
+                    self.redo();
+                }
+                if action_reset_zoom {
+                    self.scale = 1.0;
+                    self.set_status("Zoom: 100% 🔍");
+                }
             });
+
+        // Minimalist Centered Splash Dialog
+        let recent_splash_items: Vec<crate::splash_screen::SplashRecentItem> = self
+            .library
+            .items
+            .iter()
+            .take(5)
+            .map(|item| crate::splash_screen::SplashRecentItem {
+                path: item.path.clone(),
+                title: item.title.clone(),
+                modified_str: item.format_modified(),
+            })
+            .collect();
+
+        let has_recoverable_session = crate::autosave::AutosaveManager::check_recovery_available().is_some();
+
+        if let Some(act) = self.splash_screen.render(ctx, &recent_splash_items, has_recoverable_session) {
+            match act {
+                crate::splash_screen::SplashAction::NewBlank => {
+                    self.notebook.current_page_mut().paper_type = PaperType::Blank;
+                    self.set_status("Started with Blank Canvas");
+                }
+                crate::splash_screen::SplashAction::NewRuled => {
+                    self.notebook.current_page_mut().paper_type = PaperType::Ruled;
+                    self.set_status("Started with Ruled Paper");
+                }
+                crate::splash_screen::SplashAction::NewGrid => {
+                    self.notebook.current_page_mut().paper_type = PaperType::Grid;
+                    self.set_status("Started with Grid Paper");
+                }
+                crate::splash_screen::SplashAction::NewCornell => {
+                    self.notebook.current_page_mut().paper_type = PaperType::Cornell;
+                    self.set_status("Started with Cornell Notes");
+                }
+                crate::splash_screen::SplashAction::OpenMathStudio => {
+                    self.math_studio.is_open = true;
+                    self.set_status("Math Studio OPEN");
+                }
+                crate::splash_screen::SplashAction::OpenFlowchart => {
+                    self.flowchart_editor.is_open = true;
+                    self.set_status("Flowchart Studio OPEN");
+                }
+                crate::splash_screen::SplashAction::OpenRecent(path) => {
+                    if let Err(e) = self.open_notebook_from_path(&path) {
+                        self.set_error(&format!("Could not open notebook: {}", e));
+                    }
+                }
+                crate::splash_screen::SplashAction::OpenLibrary => {
+                    self.library.is_open = true;
+                }
+                crate::splash_screen::SplashAction::RecoverLastSession => {
+                    self.recover_last_session();
+                    self.autosave.recovery_restored_banner = None;
+                }
+                crate::splash_screen::SplashAction::OpenFilePicker => {
+                    self.prompt_open_file();
+                }
+                crate::splash_screen::SplashAction::OpenKeyboardShortcuts => {
+                    self.shortcuts_dialog.open();
+                }
+                crate::splash_screen::SplashAction::StartOnboardingTour => {
+                    self.onboarding_tour.start();
+                }
+            }
+        }
+
+        // Keyboard Shortcuts interactive configuration window
+        self.shortcuts_dialog.render(ctx, &mut self.shortcut_manager);
+
+        // Onboarding Tour interactive walkthrough overlay
+        self.onboarding_tour.render(ctx);
+
+        // Auto-Updater notification modal
+        self.updater.render(ctx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decode_svg_vector() {
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="40" stroke="green" stroke-width="4" fill="yellow" /></svg>"#;
+        let res = InkkApp::decode_image_or_svg(svg.as_bytes());
+        assert!(
+            res.is_some(),
+            "SVG should be successfully decoded to raster image bytes"
+        );
+        let (bytes, w, h) = res.unwrap();
+        assert!(!bytes.is_empty());
+        assert_eq!(w, 100.0);
+        assert_eq!(h, 100.0);
+    }
+
+    #[test]
+    fn test_pointer_buttons() {
+        let _ = egui::PointerButton::Primary;
+        let _ = egui::PointerButton::Secondary;
+        let _ = egui::PointerButton::Middle;
+        let _ = egui::PointerButton::Extra1;
+        let _ = egui::PointerButton::Extra2;
     }
 }

@@ -1,7 +1,7 @@
 //! Function Registry for Inkk MathEngine: Built-in and User-defined Functions
-use std::collections::HashMap;
 use crate::math_engine::error::MathError;
 use crate::math_engine::value::{format_scalar_display, MathValue};
+use std::collections::HashMap;
 
 pub use crate::math_engine::ast::{FunctionMetadata, UserFunctionAst};
 
@@ -83,7 +83,11 @@ impl FunctionRegistry {
         );
     }
 
-    pub fn register_user(&mut self, ast: UserFunctionAst, meta: FunctionMetadata) -> Result<(), MathError> {
+    pub fn register_user(
+        &mut self,
+        ast: UserFunctionAst,
+        meta: FunctionMetadata,
+    ) -> Result<(), MathError> {
         let name = &meta.name;
         // Conflict check with builtin
         if let Some(entry) = self.entries.get(name) {
@@ -208,132 +212,821 @@ impl FunctionRegistry {
         );
 
         // --- Trigonometric & Math ---
-        self.register_builtin("sin", 1, 1, 1, "Sine of argument in radians.", &["sin(pi/2)"], builtin_unary_math);
-        self.register_builtin("cos", 1, 1, 1, "Cosine of argument in radians.", &["cos(pi)"], builtin_unary_math);
-        self.register_builtin("tan", 1, 1, 1, "Tangent of argument in radians.", &["tan(0)"], builtin_unary_math);
-        self.register_builtin("asin", 1, 1, 1, "Inverse sine in radians.", &["asin(1)"], builtin_unary_math);
-        self.register_builtin("acos", 1, 1, 1, "Inverse cosine in radians.", &["acos(0)"], builtin_unary_math);
-        self.register_builtin("atan", 1, 1, 1, "Inverse tangent in radians.", &["atan(1)"], builtin_unary_math);
-        self.register_builtin("atan2", 2, 2, 1, "Four-quadrant inverse tangent atan2(y, x).", &["atan2(1, 1)"], builtin_atan2);
-        self.register_builtin("sinh", 1, 1, 1, "Hyperbolic sine.", &["sinh(1)"], builtin_unary_math);
-        self.register_builtin("cosh", 1, 1, 1, "Hyperbolic cosine.", &["cosh(0)"], builtin_unary_math);
-        self.register_builtin("tanh", 1, 1, 1, "Hyperbolic tangent.", &["tanh(1)"], builtin_unary_math);
-        self.register_builtin("exp", 1, 1, 1, "Exponential function e^x.", &["exp(1)"], builtin_unary_math);
-        self.register_builtin("log", 1, 1, 1, "Natural logarithm ln(x).", &["log(e)"], builtin_unary_math);
-        self.register_builtin("log10", 1, 1, 1, "Common (base 10) logarithm.", &["log10(100)"], builtin_unary_math);
-        self.register_builtin("log2", 1, 1, 1, "Base 2 logarithm.", &["log2(8)"], builtin_unary_math);
-        self.register_builtin("sqrt", 1, 1, 1, "Square root.", &["sqrt(16)"], builtin_unary_math);
-        self.register_builtin("abs", 1, 1, 1, "Absolute value.", &["abs(-5)"], builtin_unary_math);
-        self.register_builtin("floor", 1, 1, 1, "Round toward negative infinity.", &["floor(3.7)"], builtin_unary_math);
-        self.register_builtin("ceil", 1, 1, 1, "Round toward positive infinity.", &["ceil(3.2)"], builtin_unary_math);
-        self.register_builtin("round", 1, 1, 1, "Round to nearest integer.", &["round(3.5)"], builtin_unary_math);
-        self.register_builtin("fix", 1, 1, 1, "Round toward zero.", &["fix(-3.7)"], builtin_unary_math);
-        self.register_builtin("sign", 1, 1, 1, "Signum function (-1, 0, 1).", &["sign(-5)"], builtin_unary_math);
-        self.register_builtin("mod", 2, 2, 1, "Modulus after division.", &["mod(10, 3)"], builtin_mod);
-        self.register_builtin("rem", 2, 2, 1, "Remainder after division.", &["rem(10, 3)"], builtin_rem);
-        self.register_builtin("max", 1, 2, 1, "Maximum elements.", &["max([1 5 3])", "max(A, B)"], builtin_max);
-        self.register_builtin("min", 1, 2, 1, "Minimum elements.", &["min([1 5 3])", "min(A, B)"], builtin_min);
+        self.register_builtin(
+            "sin",
+            1,
+            1,
+            1,
+            "Sine of argument in radians.",
+            &["sin(pi/2)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "cos",
+            1,
+            1,
+            1,
+            "Cosine of argument in radians.",
+            &["cos(pi)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "tan",
+            1,
+            1,
+            1,
+            "Tangent of argument in radians.",
+            &["tan(0)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "asin",
+            1,
+            1,
+            1,
+            "Inverse sine in radians.",
+            &["asin(1)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "acos",
+            1,
+            1,
+            1,
+            "Inverse cosine in radians.",
+            &["acos(0)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "atan",
+            1,
+            1,
+            1,
+            "Inverse tangent in radians.",
+            &["atan(1)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "atan2",
+            2,
+            2,
+            1,
+            "Four-quadrant inverse tangent atan2(y, x).",
+            &["atan2(1, 1)"],
+            builtin_atan2,
+        );
+        self.register_builtin(
+            "sinh",
+            1,
+            1,
+            1,
+            "Hyperbolic sine.",
+            &["sinh(1)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "cosh",
+            1,
+            1,
+            1,
+            "Hyperbolic cosine.",
+            &["cosh(0)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "tanh",
+            1,
+            1,
+            1,
+            "Hyperbolic tangent.",
+            &["tanh(1)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "exp",
+            1,
+            1,
+            1,
+            "Exponential function e^x.",
+            &["exp(1)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "log",
+            1,
+            1,
+            1,
+            "Natural logarithm ln(x).",
+            &["log(e)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "log10",
+            1,
+            1,
+            1,
+            "Common (base 10) logarithm.",
+            &["log10(100)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "log2",
+            1,
+            1,
+            1,
+            "Base 2 logarithm.",
+            &["log2(8)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "sqrt",
+            1,
+            1,
+            1,
+            "Square root.",
+            &["sqrt(16)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "abs",
+            1,
+            1,
+            1,
+            "Absolute value.",
+            &["abs(-5)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "floor",
+            1,
+            1,
+            1,
+            "Round toward negative infinity.",
+            &["floor(3.7)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "ceil",
+            1,
+            1,
+            1,
+            "Round toward positive infinity.",
+            &["ceil(3.2)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "round",
+            1,
+            1,
+            1,
+            "Round to nearest integer.",
+            &["round(3.5)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "fix",
+            1,
+            1,
+            1,
+            "Round toward zero.",
+            &["fix(-3.7)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "sign",
+            1,
+            1,
+            1,
+            "Signum function (-1, 0, 1).",
+            &["sign(-5)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "mod",
+            2,
+            2,
+            1,
+            "Modulus after division.",
+            &["mod(10, 3)"],
+            builtin_mod,
+        );
+        self.register_builtin(
+            "rem",
+            2,
+            2,
+            1,
+            "Remainder after division.",
+            &["rem(10, 3)"],
+            builtin_rem,
+        );
+        self.register_builtin(
+            "max",
+            1,
+            2,
+            1,
+            "Maximum elements.",
+            &["max([1 5 3])", "max(A, B)"],
+            builtin_max,
+        );
+        self.register_builtin(
+            "min",
+            1,
+            2,
+            1,
+            "Minimum elements.",
+            &["min([1 5 3])", "min(A, B)"],
+            builtin_min,
+        );
 
         // --- Statistics ---
-        self.register_builtin("sum", 1, 1, 1, "Sum of array elements.", &["sum([1 2 3])"], builtin_sum);
-        self.register_builtin("prod", 1, 1, 1, "Product of array elements.", &["prod([1 2 3 4])"], builtin_prod);
-        self.register_builtin("mean", 1, 1, 1, "Average or mean value of arrays.", &["mean([1 2 3 4])"], builtin_mean);
-        self.register_builtin("cumsum", 1, 1, 1, "Cumulative sum.", &["cumsum([1 2 3 4])"], builtin_cumsum);
-        self.register_builtin("sort", 1, 1, 1, "Sort array elements ascending.", &["sort([3 1 4 2])"], builtin_sort);
-        self.register_builtin("norm", 1, 1, 1, "Vector 2-norm.", &["norm([3 4])"], builtin_norm);
+        self.register_builtin(
+            "sum",
+            1,
+            1,
+            1,
+            "Sum of array elements.",
+            &["sum([1 2 3])"],
+            builtin_sum,
+        );
+        self.register_builtin(
+            "prod",
+            1,
+            1,
+            1,
+            "Product of array elements.",
+            &["prod([1 2 3 4])"],
+            builtin_prod,
+        );
+        self.register_builtin(
+            "mean",
+            1,
+            1,
+            1,
+            "Average or mean value of arrays.",
+            &["mean([1 2 3 4])"],
+            builtin_mean,
+        );
+        self.register_builtin(
+            "cumsum",
+            1,
+            1,
+            1,
+            "Cumulative sum.",
+            &["cumsum([1 2 3 4])"],
+            builtin_cumsum,
+        );
+        self.register_builtin(
+            "sort",
+            1,
+            1,
+            1,
+            "Sort array elements ascending.",
+            &["sort([3 1 4 2])"],
+            builtin_sort,
+        );
+        self.register_builtin(
+            "norm",
+            1,
+            1,
+            1,
+            "Vector 2-norm.",
+            &["norm([3 4])"],
+            builtin_norm,
+        );
 
         // --- Linear Algebra ---
-        self.register_builtin("det", 1, 1, 1, "Matrix determinant.", &["det([1 2; 3 4])"], builtin_det);
-        self.register_builtin("inv", 1, 1, 1, "Matrix inverse.", &["inv([1 2; 3 4])"], builtin_inv);
-        self.register_builtin("trace", 1, 1, 1, "Sum of diagonal elements.", &["trace(A)"], builtin_trace);
+        self.register_builtin(
+            "det",
+            1,
+            1,
+            1,
+            "Matrix determinant.",
+            &["det([1 2; 3 4])"],
+            builtin_det,
+        );
+        self.register_builtin(
+            "inv",
+            1,
+            1,
+            1,
+            "Matrix inverse.",
+            &["inv([1 2; 3 4])"],
+            builtin_inv,
+        );
+        self.register_builtin(
+            "trace",
+            1,
+            1,
+            1,
+            "Sum of diagonal elements.",
+            &["trace(A)"],
+            builtin_trace,
+        );
         self.register_builtin("rank", 1, 1, 1, "Matrix rank.", &["rank(A)"], builtin_rank);
-        self.register_builtin("transpose", 1, 1, 1, "Matrix transpose.", &["transpose(A)"], builtin_transpose);
+        self.register_builtin(
+            "transpose",
+            1,
+            1,
+            1,
+            "Matrix transpose.",
+            &["transpose(A)"],
+            builtin_transpose,
+        );
 
         // --- Printing ---
-        self.register_builtin("disp", 1, 1, 0, "Display value or text.", &["disp(\"Hello\")", "disp(A)"], builtin_disp);
+        self.register_builtin(
+            "disp",
+            1,
+            1,
+            0,
+            "Display value or text.",
+            &["disp(\"Hello\")", "disp(A)"],
+            builtin_disp,
+        );
 
         // --- Plotting ---
-        self.register_builtin("plot", 1, 20, 0, "2D line plot.", &["plot(y)", "plot(x, y)", "plot(x, y, \"r--\")", "plot(x1, y1, x2, y2)"], builtin_plot);
-        self.register_builtin("title", 1, 1, 0, "Set plot title.", &["title(\"Sine Wave\")"], builtin_title);
-        self.register_builtin("xlabel", 1, 1, 0, "Set x-axis label.", &["xlabel(\"Time\")"], builtin_xlabel);
-        self.register_builtin("ylabel", 1, 1, 0, "Set y-axis label.", &["ylabel(\"Amplitude\")"], builtin_ylabel);
-        self.register_builtin("legend", 1, 10, 0, "Add legend to axes.", &["legend(\"sin\", \"cos\")"], builtin_legend);
-        self.register_builtin("xlim", 1, 1, 0, "Set x-axis limits.", &["xlim([-5 5])"], builtin_xlim);
-        self.register_builtin("ylim", 1, 1, 0, "Set y-axis limits.", &["ylim([-2 2])"], builtin_ylim);
-        self.register_builtin("clf", 0, 0, 0, "Clear current figure.", &["clf"], builtin_clf);
+        self.register_builtin(
+            "plot",
+            1,
+            20,
+            0,
+            "2D line plot.",
+            &[
+                "plot(y)",
+                "plot(x, y)",
+                "plot(x, y, \"r--\")",
+                "plot(x1, y1, x2, y2)",
+            ],
+            builtin_plot,
+        );
+        self.register_builtin(
+            "title",
+            1,
+            1,
+            0,
+            "Set plot title.",
+            &["title(\"Sine Wave\")"],
+            builtin_title,
+        );
+        self.register_builtin(
+            "xlabel",
+            1,
+            1,
+            0,
+            "Set x-axis label.",
+            &["xlabel(\"Time\")"],
+            builtin_xlabel,
+        );
+        self.register_builtin(
+            "ylabel",
+            1,
+            1,
+            0,
+            "Set y-axis label.",
+            &["ylabel(\"Amplitude\")"],
+            builtin_ylabel,
+        );
+        self.register_builtin(
+            "legend",
+            1,
+            10,
+            0,
+            "Add legend to axes.",
+            &["legend(\"sin\", \"cos\")"],
+            builtin_legend,
+        );
+        self.register_builtin(
+            "xlim",
+            1,
+            1,
+            0,
+            "Set x-axis limits.",
+            &["xlim([-5 5])"],
+            builtin_xlim,
+        );
+        self.register_builtin(
+            "ylim",
+            1,
+            1,
+            0,
+            "Set y-axis limits.",
+            &["ylim([-2 2])"],
+            builtin_ylim,
+        );
+        self.register_builtin(
+            "clf",
+            0,
+            0,
+            0,
+            "Clear current figure.",
+            &["clf"],
+            builtin_clf,
+        );
 
         // --- Tier 1B: Arithmetic / THCS ---
-        self.register_builtin("gcd", 2, 2, 1, "Greatest common divisor.", &["gcd(12, 18)"], builtin_gcd);
-        self.register_builtin("lcm", 2, 2, 1, "Least common multiple.", &["lcm(4, 6)"], builtin_lcm);
-        self.register_builtin("factorial", 1, 1, 1, "Factorial function n!.", &["factorial(5)"], builtin_factorial);
-        self.register_builtin("nchoosek", 2, 2, 1, "Binomial coefficient (combinations).", &["nchoosek(5, 2)"], builtin_nchoosek);
-        self.register_builtin("isprime", 1, 1, 1, "True for prime numbers.", &["isprime(7)"], builtin_isprime);
-        self.register_builtin("primes", 1, 1, 1, "Prime numbers less than or equal to n.", &["primes(20)"], builtin_primes);
-        self.register_builtin("factor", 1, 1, 1, "Prime factors of integer.", &["factor(60)"], builtin_factor);
-        self.register_builtin("nthroot", 2, 2, 1, "Real nth root of real numbers.", &["nthroot(-8, 3)"], builtin_nthroot);
+        self.register_builtin(
+            "gcd",
+            2,
+            2,
+            1,
+            "Greatest common divisor.",
+            &["gcd(12, 18)"],
+            builtin_gcd,
+        );
+        self.register_builtin(
+            "lcm",
+            2,
+            2,
+            1,
+            "Least common multiple.",
+            &["lcm(4, 6)"],
+            builtin_lcm,
+        );
+        self.register_builtin(
+            "factorial",
+            1,
+            1,
+            1,
+            "Factorial function n!.",
+            &["factorial(5)"],
+            builtin_factorial,
+        );
+        self.register_builtin(
+            "nchoosek",
+            2,
+            2,
+            1,
+            "Binomial coefficient (combinations).",
+            &["nchoosek(5, 2)"],
+            builtin_nchoosek,
+        );
+        self.register_builtin(
+            "isprime",
+            1,
+            1,
+            1,
+            "True for prime numbers.",
+            &["isprime(7)"],
+            builtin_isprime,
+        );
+        self.register_builtin(
+            "primes",
+            1,
+            1,
+            1,
+            "Prime numbers less than or equal to n.",
+            &["primes(20)"],
+            builtin_primes,
+        );
+        self.register_builtin(
+            "factor",
+            1,
+            1,
+            1,
+            "Prime factors of integer.",
+            &["factor(60)"],
+            builtin_factor,
+        );
+        self.register_builtin(
+            "nthroot",
+            2,
+            2,
+            1,
+            "Real nth root of real numbers.",
+            &["nthroot(-8, 3)"],
+            builtin_nthroot,
+        );
 
         // --- Tier 1B: Degrees Trigonometry ---
-        self.register_builtin("sind", 1, 1, 1, "Sine of argument in degrees.", &["sind(30)", "sind(180)"], builtin_unary_math);
-        self.register_builtin("cosd", 1, 1, 1, "Cosine of argument in degrees.", &["cosd(90)"], builtin_unary_math);
-        self.register_builtin("tand", 1, 1, 1, "Tangent of argument in degrees.", &["tand(45)"], builtin_unary_math);
-        self.register_builtin("deg2rad", 1, 1, 1, "Convert degrees to radians.", &["deg2rad(180)"], builtin_unary_math);
-        self.register_builtin("rad2deg", 1, 1, 1, "Convert radians to degrees.", &["rad2deg(pi)"], builtin_unary_math);
+        self.register_builtin(
+            "sind",
+            1,
+            1,
+            1,
+            "Sine of argument in degrees.",
+            &["sind(30)", "sind(180)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "cosd",
+            1,
+            1,
+            1,
+            "Cosine of argument in degrees.",
+            &["cosd(90)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "tand",
+            1,
+            1,
+            1,
+            "Tangent of argument in degrees.",
+            &["tand(45)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "deg2rad",
+            1,
+            1,
+            1,
+            "Convert degrees to radians.",
+            &["deg2rad(180)"],
+            builtin_unary_math,
+        );
+        self.register_builtin(
+            "rad2deg",
+            1,
+            1,
+            1,
+            "Convert radians to degrees.",
+            &["rad2deg(pi)"],
+            builtin_unary_math,
+        );
 
         // --- Tier 1B: Statistics ---
-        self.register_builtin("std", 1, 1, 1, "Sample standard deviation (divided by n-1).", &["std([1 2 3 4])"], builtin_std);
-        self.register_builtin("var", 1, 1, 1, "Sample variance (divided by n-1).", &["var([1 2 3 4])"], builtin_var);
-        self.register_builtin("median", 1, 1, 1, "Median value of array.", &["median([3 1 2])"], builtin_median);
-        self.register_builtin("cumprod", 1, 1, 1, "Cumulative product.", &["cumprod([1 2 3 4])"], builtin_cumprod);
-        self.register_builtin("diff", 1, 1, 1, "Differences and approximate derivatives.", &["diff([1 4 9 16])"], builtin_diff);
+        self.register_builtin(
+            "std",
+            1,
+            1,
+            1,
+            "Sample standard deviation (divided by n-1).",
+            &["std([1 2 3 4])"],
+            builtin_std,
+        );
+        self.register_builtin(
+            "var",
+            1,
+            1,
+            1,
+            "Sample variance (divided by n-1).",
+            &["var([1 2 3 4])"],
+            builtin_var,
+        );
+        self.register_builtin(
+            "median",
+            1,
+            1,
+            1,
+            "Median value of array.",
+            &["median([3 1 2])"],
+            builtin_median,
+        );
+        self.register_builtin(
+            "cumprod",
+            1,
+            1,
+            1,
+            "Cumulative product.",
+            &["cumprod([1 2 3 4])"],
+            builtin_cumprod,
+        );
+        self.register_builtin(
+            "diff",
+            1,
+            1,
+            1,
+            "Differences and approximate derivatives.",
+            &["diff([1 4 9 16])"],
+            builtin_diff,
+        );
 
         // --- Tier 1B: Polynomials ---
-        self.register_builtin("polyfit", 3, 3, 1, "Polynomial curve fitting.", &["polyfit([1 2 3], [2 4 6], 1)"], builtin_polyfit);
-        self.register_builtin("polyval", 2, 2, 1, "Polynomial evaluation.", &["polyval([1 0 -1], 3)"], builtin_polyval);
-        self.register_builtin("roots", 1, 1, 1, "Real roots of polynomial (sorted descending).", &["roots([1 -3 2])"], builtin_roots);
+        self.register_builtin(
+            "polyfit",
+            3,
+            3,
+            1,
+            "Polynomial curve fitting.",
+            &["polyfit([1 2 3], [2 4 6], 1)"],
+            builtin_polyfit,
+        );
+        self.register_builtin(
+            "polyval",
+            2,
+            2,
+            1,
+            "Polynomial evaluation.",
+            &["polyval([1 0 -1], 3)"],
+            builtin_polyval,
+        );
+        self.register_builtin(
+            "roots",
+            1,
+            1,
+            1,
+            "Real roots of polynomial (sorted descending).",
+            &["roots([1 -3 2])"],
+            builtin_roots,
+        );
 
         // --- Tier 1B: Numerical Calculus ---
-        self.register_builtin("trapz", 1, 2, 1, "Trapezoidal numerical integration.", &["trapz([0 1 2], [0 1 4])"], builtin_trapz);
+        self.register_builtin(
+            "trapz",
+            1,
+            2,
+            1,
+            "Trapezoidal numerical integration.",
+            &["trapz([0 1 2], [0 1 4])"],
+            builtin_trapz,
+        );
 
         // --- Tier 1B: 3D Vectors ---
-        self.register_builtin("dot", 2, 2, 1, "Vector dot product.", &["dot([1 2 3], [4 5 6])"], builtin_dot);
-        self.register_builtin("cross", 2, 2, 1, "Vector cross product for 3-element vectors.", &["cross([1 0 0], [0 1 0])"], builtin_cross);
+        self.register_builtin(
+            "dot",
+            2,
+            2,
+            1,
+            "Vector dot product.",
+            &["dot([1 2 3], [4 5 6])"],
+            builtin_dot,
+        );
+        self.register_builtin(
+            "cross",
+            2,
+            2,
+            1,
+            "Vector cross product for 3-element vectors.",
+            &["cross([1 0 0], [0 1 0])"],
+            builtin_cross,
+        );
 
         // --- Tier 1B: Matrix ---
-        self.register_builtin("reshape", 3, 3, 1, "Reshape array (column-major).", &["reshape(1:6, 2, 3)"], builtin_reshape);
-        self.register_builtin("fliplr", 1, 1, 1, "Flip matrix left to right.", &["fliplr(A)"], builtin_fliplr);
-        self.register_builtin("flipud", 1, 1, 1, "Flip matrix up to down.", &["flipud(A)"], builtin_flipud);
+        self.register_builtin(
+            "reshape",
+            3,
+            3,
+            1,
+            "Reshape array (column-major).",
+            &["reshape(1:6, 2, 3)"],
+            builtin_reshape,
+        );
+        self.register_builtin(
+            "fliplr",
+            1,
+            1,
+            1,
+            "Flip matrix left to right.",
+            &["fliplr(A)"],
+            builtin_fliplr,
+        );
+        self.register_builtin(
+            "flipud",
+            1,
+            1,
+            1,
+            "Flip matrix up to down.",
+            &["flipud(A)"],
+            builtin_flipud,
+        );
 
         // --- Tier 1B: Random ---
-        self.register_builtin("rng", 1, 1, 0, "Control random number generation seed.", &["rng(1)"], builtin_rng);
-        self.register_builtin("randi", 1, 3, 1, "Uniformly distributed pseudorandom integers.", &["randi(10)", "randi(10, 2, 3)"], builtin_randi);
+        self.register_builtin(
+            "rng",
+            1,
+            1,
+            0,
+            "Control random number generation seed.",
+            &["rng(1)"],
+            builtin_rng,
+        );
+        self.register_builtin(
+            "randi",
+            1,
+            3,
+            1,
+            "Uniformly distributed pseudorandom integers.",
+            &["randi(10)", "randi(10, 2, 3)"],
+            builtin_randi,
+        );
 
         // --- Tier 1B: Strings ---
-        self.register_builtin("num2str", 1, 1, 1, "Convert numbers to string.", &["num2str(pi)", "num2str(5)"], builtin_num2str);
+        self.register_builtin(
+            "num2str",
+            1,
+            1,
+            1,
+            "Convert numbers to string.",
+            &["num2str(pi)", "num2str(5)"],
+            builtin_num2str,
+        );
 
         // --- Tier 1B: Extended Plots ---
         self.register_builtin("bar", 1, 2, 0, "Bar graph.", &["bar([1 2 3])"], builtin_bar);
-        self.register_builtin("hist", 1, 2, 0, "Histogram.", &["hist(v)", "hist(v, 20)"], builtin_hist);
-        self.register_builtin("pie", 1, 1, 0, "Pie chart (cannot be combined with other plots).", &["pie([1 2 3])"], builtin_pie);
-        self.register_builtin("scatter", 2, 2, 0, "Scatter plot.", &["scatter(x, y)"], builtin_scatter);
-        self.register_builtin("xline", 1, 1, 0, "Vertical line with constant x-value.", &["xline(2)"], builtin_xline);
-        self.register_builtin("yline", 1, 1, 0, "Horizontal line with constant y-value.", &["yline(0)"], builtin_yline);
-        self.register_builtin("axis", 1, 1, 0, "Set axis limits or scaling.", &["axis equal", "axis([0 10 0 20])"], builtin_axis);
-        self.register_builtin("text", 3, 3, 0, "Add text descriptions to data points.", &["text(x, y, \"Label\")"], builtin_text);
+        self.register_builtin(
+            "hist",
+            1,
+            2,
+            0,
+            "Histogram.",
+            &["hist(v)", "hist(v, 20)"],
+            builtin_hist,
+        );
+        self.register_builtin(
+            "pie",
+            1,
+            1,
+            0,
+            "Pie chart (cannot be combined with other plots).",
+            &["pie([1 2 3])"],
+            builtin_pie,
+        );
+        self.register_builtin(
+            "scatter",
+            2,
+            2,
+            0,
+            "Scatter plot.",
+            &["scatter(x, y)"],
+            builtin_scatter,
+        );
+        self.register_builtin(
+            "xline",
+            1,
+            1,
+            0,
+            "Vertical line with constant x-value.",
+            &["xline(2)"],
+            builtin_xline,
+        );
+        self.register_builtin(
+            "yline",
+            1,
+            1,
+            0,
+            "Horizontal line with constant y-value.",
+            &["yline(0)"],
+            builtin_yline,
+        );
+        self.register_builtin(
+            "axis",
+            1,
+            1,
+            0,
+            "Set axis limits or scaling.",
+            &["axis equal", "axis([0 10 0 20])"],
+            builtin_axis,
+        );
+        self.register_builtin(
+            "text",
+            3,
+            3,
+            0,
+            "Add text descriptions to data points.",
+            &["text(x, y, \"Label\")"],
+            builtin_text,
+        );
 
         // --- Tier 2 ---
-        self.register_builtin("eig", 1, 1, 1, "Matrix eigenvalues.", &["eig(A)"], builtin_eig);
-        self.register_builtin("fplot", 2, 2, 0, "Plot function.", &["fplot(@(x) sin(x), [-5 5])"], builtin_fplot);
-        self.register_builtin("fprintf", 1, 20, 0, "Write formatted data to text output.", &["fprintf(\"val = %d\\n\", 42)"], builtin_fprintf);
-        self.register_builtin("error", 1, 1, 0, "Display error message and abort execution.", &["error('Custom error')"], builtin_error);
+        self.register_builtin(
+            "eig",
+            1,
+            1,
+            1,
+            "Matrix eigenvalues.",
+            &["eig(A)"],
+            builtin_eig,
+        );
+        self.register_builtin(
+            "fplot",
+            2,
+            2,
+            0,
+            "Plot function.",
+            &["fplot(@(x) sin(x), [-5 5])"],
+            builtin_fplot,
+        );
+        self.register_builtin(
+            "fprintf",
+            1,
+            20,
+            0,
+            "Write formatted data to text output.",
+            &["fprintf(\"val = %d\\n\", 42)"],
+            builtin_fprintf,
+        );
+        self.register_builtin(
+            "error",
+            1,
+            1,
+            0,
+            "Display error message and abort execution.",
+            &["error('Custom error')"],
+            builtin_error,
+        );
     }
 }
 
 // --- Built-in Implementation Functions ---
 
 fn builtin_zeros(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let r = args[0].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+    let r = args[0]
+        .as_scalar()
+        .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
     let c = if args.len() >= 2 {
-        args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize
+        args[1]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize
     } else {
         r
     };
@@ -341,9 +1034,13 @@ fn builtin_zeros(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
 }
 
 fn builtin_ones(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let r = args[0].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+    let r = args[0]
+        .as_scalar()
+        .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
     let c = if args.len() >= 2 {
-        args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize
+        args[1]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize
     } else {
         r
     };
@@ -351,9 +1048,13 @@ fn builtin_ones(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
 }
 
 fn builtin_eye(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let r = args[0].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+    let r = args[0]
+        .as_scalar()
+        .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
     let c = if args.len() >= 2 {
-        args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize
+        args[1]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize
     } else {
         r
     };
@@ -361,10 +1062,16 @@ fn builtin_eye(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
 }
 
 fn builtin_linspace(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let a = args[0].as_scalar().ok_or(MathError::Other("linspace: a must be scalar".into()))?;
-    let b = args[1].as_scalar().ok_or(MathError::Other("linspace: b must be scalar".into()))?;
+    let a = args[0]
+        .as_scalar()
+        .ok_or(MathError::Other("linspace: a must be scalar".into()))?;
+    let b = args[1]
+        .as_scalar()
+        .ok_or(MathError::Other("linspace: b must be scalar".into()))?;
     let n = if args.len() >= 3 {
-        args[2].as_scalar().ok_or(MathError::Other("linspace: n must be scalar".into()))? as usize
+        args[2]
+            .as_scalar()
+            .ok_or(MathError::Other("linspace: n must be scalar".into()))? as usize
     } else {
         100
     };
@@ -417,7 +1124,9 @@ fn builtin_diag(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
 // Linear congruential pseudo-random generator
 fn builtin_rand(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     let next_rand = |seed: &mut u64| -> f64 {
-        *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let val = (*seed >> 11) as f64;
         val / 9007199254740992.0
     };
@@ -425,11 +1134,17 @@ fn builtin_rand(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, 
     let (rows, cols) = if args.is_empty() {
         (1, 1)
     } else if args.len() == 1 {
-        let n = args[0].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+        let n = args[0]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
         (n, n)
     } else {
-        let r = args[0].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
-        let c = args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+        let r = args[0]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+        let c = args[1]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
         (r, c)
     };
 
@@ -445,7 +1160,9 @@ fn builtin_size(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
     let val = &args[0];
     let (rows, cols) = (val.rows(), val.cols());
     if args.len() == 2 {
-        let dim = args[1].as_scalar().ok_or(MathError::Other("size: dim must be scalar".into()))? as usize;
+        let dim = args[1]
+            .as_scalar()
+            .ok_or(MathError::Other("size: dim must be scalar".into()))? as usize;
         let res = match dim {
             1 => rows as f64,
             2 => cols as f64,
@@ -489,7 +1206,10 @@ impl FunctionRegistry {
         args: &[MathValue],
         ctx: &mut EvalContext,
     ) -> Result<MathValue, MathError> {
-        let entry = self.entries.get(name).ok_or_else(|| MathError::UnrecognizedIdent(name.to_string()))?;
+        let entry = self
+            .entries
+            .get(name)
+            .ok_or_else(|| MathError::UnrecognizedIdent(name.to_string()))?;
 
         if args.len() < entry.metadata.min_args {
             return Err(MathError::NotEnoughArguments(name.to_string()));
@@ -503,9 +1223,31 @@ impl FunctionRegistry {
                 // If it's unary math:
                 if matches!(
                     name,
-                    "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "sinh" | "cosh" | "tanh"
-                        | "exp" | "log" | "log10" | "log2" | "sqrt" | "abs" | "floor" | "ceil"
-                        | "round" | "fix" | "sign" | "sind" | "cosd" | "tand" | "deg2rad" | "rad2deg"
+                    "sin"
+                        | "cos"
+                        | "tan"
+                        | "asin"
+                        | "acos"
+                        | "atan"
+                        | "sinh"
+                        | "cosh"
+                        | "tanh"
+                        | "exp"
+                        | "log"
+                        | "log10"
+                        | "log2"
+                        | "sqrt"
+                        | "abs"
+                        | "floor"
+                        | "ceil"
+                        | "round"
+                        | "fix"
+                        | "sign"
+                        | "sind"
+                        | "cosd"
+                        | "tand"
+                        | "deg2rad"
+                        | "rad2deg"
                 ) {
                     return apply_unary_math(name, &args[0]);
                 }
@@ -513,7 +1255,9 @@ impl FunctionRegistry {
             }
             FunctionKind::User(..) => {
                 // Tier 3
-                Err(MathError::Other("User functions executed via call frame".into()))
+                Err(MathError::Other(
+                    "User functions executed via call frame".into(),
+                ))
             }
         }
     }
@@ -613,7 +1357,9 @@ fn apply_unary_math(name: &str, val: &MathValue) -> Result<MathValue, MathError>
                 data: new_data,
             })
         }
-        _ => Err(MathError::Other("Cannot apply math function to string".into())),
+        _ => Err(MathError::Other(
+            "Cannot apply math function to string".into(),
+        )),
     }
 }
 
@@ -621,15 +1367,35 @@ fn builtin_atan2(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
     let y = &args[0];
     let x = &args[1];
     match (y, x) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if r1 != r2 || c1 != c2 {
-                return Err(MathError::ArraysIncompatibleSizes { r1: *r1, c1: *c1, r2: *r2, c2: *c2 });
+                return Err(MathError::ArraysIncompatibleSizes {
+                    r1: *r1,
+                    c1: *c1,
+                    r2: *r2,
+                    c2: *c2,
+                });
             }
             let mut new_data = Vec::with_capacity(d1.len());
             for (&y_val, &x_val) in d1.iter().zip(d2.iter()) {
                 new_data.push(y_val.atan2(x_val));
             }
-            Ok(MathValue::Matrix { rows: *r1, cols: *c1, data: new_data })
+            Ok(MathValue::Matrix {
+                rows: *r1,
+                cols: *c1,
+                data: new_data,
+            })
         }
         _ => Err(MathError::Other("atan2 arguments must be matrices".into())),
     }
@@ -685,7 +1451,11 @@ fn builtin_max(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
         }
         data.push(col_max);
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data,
+    })
 }
 
 fn builtin_min(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
@@ -711,7 +1481,11 @@ fn builtin_min(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
         }
         data.push(col_min);
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data,
+    })
 }
 
 fn builtin_sum(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
@@ -733,7 +1507,11 @@ fn builtin_sum(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
         }
         data.push(col_sum);
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data,
+    })
 }
 
 fn builtin_prod(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
@@ -755,7 +1533,11 @@ fn builtin_prod(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
         }
         data.push(col_prod);
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data,
+    })
 }
 
 fn builtin_mean(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
@@ -777,7 +1559,11 @@ fn builtin_mean(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
         }
         data.push(col_sum / rows as f64);
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data,
+    })
 }
 
 fn builtin_cumsum(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
@@ -790,8 +1576,18 @@ fn builtin_cumsum(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValu
         // Row vector
         let v = val.to_vector().unwrap();
         let mut cur = 0.0;
-        let data: Vec<f64> = v.into_iter().map(|x| { cur += x; cur }).collect();
-        return Ok(MathValue::Matrix { rows: 1, cols, data });
+        let data: Vec<f64> = v
+            .into_iter()
+            .map(|x| {
+                cur += x;
+                cur
+            })
+            .collect();
+        return Ok(MathValue::Matrix {
+            rows: 1,
+            cols,
+            data,
+        });
     }
     // Column vector or matrix
     let mut data = vec![0.0; rows * cols];
@@ -814,7 +1610,11 @@ fn builtin_sort(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
     if rows == 1 {
         let mut v = val.to_vector().unwrap();
         v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        return Ok(MathValue::Matrix { rows: 1, cols, data: v });
+        return Ok(MathValue::Matrix {
+            rows: 1,
+            cols,
+            data: v,
+        });
     }
     let mut data = vec![0.0; rows * cols];
     for c in 0..cols {
@@ -829,7 +1629,9 @@ fn builtin_sort(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
 
 fn builtin_norm(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     let val = &args[0];
-    let v = val.to_vector().ok_or(MathError::Other("norm: only vector norm is supported".into()))?;
+    let v = val.to_vector().ok_or(MathError::Other(
+        "norm: only vector norm is supported".into(),
+    ))?;
     let sum_sq: f64 = v.iter().map(|&x| x * x).sum();
     Ok(MathValue::scalar(sum_sq.sqrt()))
 }
@@ -860,7 +1662,11 @@ fn builtin_transpose(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathV
 fn builtin_disp(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     let text = match &args[0] {
         MathValue::Str(s) => s.clone(),
-        MathValue::Matrix { rows: 1, cols: 1, data } => format_scalar_display(data[0]),
+        MathValue::Matrix {
+            rows: 1,
+            cols: 1,
+            data,
+        } => format_scalar_display(data[0]),
         _ => args[0].to_display_string(),
     };
     ctx.output_lines.push(text);
@@ -872,56 +1678,68 @@ fn builtin_disp(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, 
 fn builtin_plot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
     let default_palette: [[u8; 4]; 7] = [
         [0, 114, 189, 255],  // #0072BD
-        [217, 83, 25, 255],   // #D95319
-        [237, 177, 32, 255],  // #EDB120
-        [126, 47, 142, 255],  // #7E2F8E
-        [119, 172, 48, 255],  // #77AC30
-        [77, 190, 238, 255],  // #4DBEEE
-        [162, 20, 47, 255],   // #A2142F
+        [217, 83, 25, 255],  // #D95319
+        [237, 177, 32, 255], // #EDB120
+        [126, 47, 142, 255], // #7E2F8E
+        [119, 172, 48, 255], // #77AC30
+        [77, 190, 238, 255], // #4DBEEE
+        [162, 20, 47, 255],  // #A2142F
     ];
 
     if args.len() == 1 {
-        let y_vec = args[0].to_vector().ok_or(MathError::Other("plot(y): y must be vector".into()))?;
+        let y_vec = args[0]
+            .to_vector()
+            .ok_or(MathError::Other("plot(y): y must be vector".into()))?;
         let x_vec: Vec<f64> = (1..=y_vec.len()).map(|i| i as f64).collect();
         let curve_idx = ctx.current_figure_curves.len();
         let color = default_palette[curve_idx % default_palette.len()];
-        let label = format!("data{}", curve_idx + 1);
+        let label = String::new();
 
-        ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-            x: x_vec.clone(),
-            y: y_vec.clone(),
-            color,
-            label: label.clone(),
-            line_style: "-".to_string(),
-            marker: "".to_string(),
-            kind: crate::math_engine::eval::CurveKind::Plot,
-        });
+        ctx.current_figure_curves
+            .push(crate::math_engine::eval::CurveInfo {
+                x: x_vec.clone(),
+                y: y_vec.clone(),
+                color,
+                label: label.clone(),
+                line_style: "-".to_string(),
+                marker: "".to_string(),
+                kind: crate::math_engine::eval::CurveKind::Plot,
+            });
 
-        ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::PlotCurve {
-            x: x_vec,
-            y: y_vec,
-            label,
-            color,
-            line_style: "-".to_string(),
-            marker: "".to_string(),
-            is_hold: *ctx.hold_on,
-        });
+        ctx.canvas_commands
+            .push(crate::math_engine::eval::CanvasCommand::PlotCurve {
+                x: x_vec,
+                y: y_vec,
+                label,
+                color,
+                line_style: "-".to_string(),
+                marker: "".to_string(),
+                is_hold: *ctx.hold_on,
+            });
         return Ok(MathValue::empty());
     }
 
     let mut i = 0;
     while i < args.len() {
-        let x_vec = args[i].to_vector().ok_or(MathError::Other("plot: x must be a vector".into()))?;
+        let x_vec = args[i]
+            .to_vector()
+            .ok_or(MathError::Other("plot: x must be a vector".into()))?;
         if i + 1 >= args.len() {
             return Err(MathError::Other("plot: missing y for x vector".into()));
         }
-        let y_vec = args[i + 1].to_vector().ok_or(MathError::Other("plot: y must be a vector".into()))?;
+        let y_vec = args[i + 1]
+            .to_vector()
+            .ok_or(MathError::Other("plot: y must be a vector".into()))?;
         if x_vec.len() != y_vec.len() {
             return Err(MathError::VectorsMustBeSameLength);
         }
@@ -933,7 +1751,7 @@ fn builtin_plot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, 
         let mut color = default_color;
         let mut line_style = "-".to_string();
         let mut marker = "".to_string();
-        let mut label = format!("data{}", curve_idx + 1);
+        let mut label = String::new();
 
         while i < args.len() {
             if let MathValue::Str(spec_or_key) = &args[i] {
@@ -964,25 +1782,27 @@ fn builtin_plot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, 
             break;
         }
 
-        ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-            x: x_vec.clone(),
-            y: y_vec.clone(),
-            color,
-            label: label.clone(),
-            line_style: line_style.clone(),
-            marker: marker.clone(),
-            kind: crate::math_engine::eval::CurveKind::Plot,
-        });
+        ctx.current_figure_curves
+            .push(crate::math_engine::eval::CurveInfo {
+                x: x_vec.clone(),
+                y: y_vec.clone(),
+                color,
+                label: label.clone(),
+                line_style: line_style.clone(),
+                marker: marker.clone(),
+                kind: crate::math_engine::eval::CurveKind::Plot,
+            });
 
-        ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::PlotCurve {
-            x: x_vec,
-            y: y_vec,
-            label,
-            color,
-            line_style,
-            marker,
-            is_hold: *ctx.hold_on,
-        });
+        ctx.canvas_commands
+            .push(crate::math_engine::eval::CanvasCommand::PlotCurve {
+                x: x_vec,
+                y: y_vec,
+                label,
+                color,
+                line_style,
+                marker,
+                is_hold: *ctx.hold_on,
+            });
     }
 
     Ok(MathValue::empty())
@@ -1037,21 +1857,28 @@ fn parse_linespec(s: &str) -> Result<ParsedLineSpec, MathError> {
 
 fn builtin_title(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if let MathValue::Str(t) = &args[0] {
-        ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetTitle(t.clone()));
+        ctx.canvas_commands
+            .push(crate::math_engine::eval::CanvasCommand::SetTitle(t.clone()));
     }
     Ok(MathValue::empty())
 }
 
 fn builtin_xlabel(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if let MathValue::Str(t) = &args[0] {
-        ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetXLabel(t.clone()));
+        ctx.canvas_commands
+            .push(crate::math_engine::eval::CanvasCommand::SetXLabel(
+                t.clone(),
+            ));
     }
     Ok(MathValue::empty())
 }
 
 fn builtin_ylabel(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if let MathValue::Str(t) = &args[0] {
-        ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetYLabel(t.clone()));
+        ctx.canvas_commands
+            .push(crate::math_engine::eval::CanvasCommand::SetYLabel(
+                t.clone(),
+            ));
     }
     Ok(MathValue::empty())
 }
@@ -1063,31 +1890,43 @@ fn builtin_legend(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue
             labels.push(s.clone());
         }
     }
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetLegend(labels));
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::SetLegend(labels));
     Ok(MathValue::empty())
 }
 
 fn builtin_xlim(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let v = args[0].to_vector().ok_or(MathError::Other("xlim: must be [min max]".into()))?;
+    let v = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("xlim: must be [min max]".into()))?;
     if v.len() != 2 {
-        return Err(MathError::Other("xlim requires 2 elements [min max]".into()));
+        return Err(MathError::Other(
+            "xlim requires 2 elements [min max]".into(),
+        ));
     }
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetXLim(v[0], v[1]));
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::SetXLim(v[0], v[1]));
     Ok(MathValue::empty())
 }
 
 fn builtin_ylim(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let v = args[0].to_vector().ok_or(MathError::Other("ylim: must be [min max]".into()))?;
+    let v = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("ylim: must be [min max]".into()))?;
     if v.len() != 2 {
-        return Err(MathError::Other("ylim requires 2 elements [min max]".into()));
+        return Err(MathError::Other(
+            "ylim requires 2 elements [min max]".into(),
+        ));
     }
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetYLim(v[0], v[1]));
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::SetYLim(v[0], v[1]));
     Ok(MathValue::empty())
 }
 
 fn builtin_clf(_args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     ctx.current_figure_curves.clear();
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::ClearPlots);
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::ClearPlots);
     Ok(MathValue::empty())
 }
 
@@ -1097,7 +1936,18 @@ fn apply_binary_elementwise(
     op: fn(f64, f64) -> f64,
 ) -> Result<MathValue, MathError> {
     match (a, b) {
-        (MathValue::Matrix { rows: r1, cols: c1, data: d1 }, MathValue::Matrix { rows: r2, cols: c2, data: d2 }) => {
+        (
+            MathValue::Matrix {
+                rows: r1,
+                cols: c1,
+                data: d1,
+            },
+            MathValue::Matrix {
+                rows: r2,
+                cols: c2,
+                data: d2,
+            },
+        ) => {
             if *r1 == 1 && *c1 == 1 {
                 let s = d1[0];
                 return Ok(MathValue::Matrix {
@@ -1115,7 +1965,12 @@ fn apply_binary_elementwise(
                 });
             }
             if r1 != r2 || c1 != c2 {
-                return Err(MathError::ArraysIncompatibleSizes { r1: *r1, c1: *c1, r2: *r2, c2: *c2 });
+                return Err(MathError::ArraysIncompatibleSizes {
+                    r1: *r1,
+                    c1: *c1,
+                    r2: *r2,
+                    c2: *c2,
+                });
             }
             Ok(MathValue::Matrix {
                 rows: *r1,
@@ -1183,8 +2038,12 @@ pub fn tand_f64(deg: f64) -> f64 {
 }
 
 fn builtin_gcd(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let a = args[0].as_scalar().ok_or(MathError::ArgumentsMustBeIntegers)?;
-    let b = args[1].as_scalar().ok_or(MathError::ArgumentsMustBeIntegers)?;
+    let a = args[0]
+        .as_scalar()
+        .ok_or(MathError::ArgumentsMustBeIntegers)?;
+    let b = args[1]
+        .as_scalar()
+        .ok_or(MathError::ArgumentsMustBeIntegers)?;
     if !is_int(a) || !is_int(b) {
         return Err(MathError::ArgumentsMustBeIntegers);
     }
@@ -1202,8 +2061,12 @@ fn builtin_gcd(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
 }
 
 fn builtin_lcm(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let a = args[0].as_scalar().ok_or(MathError::ArgumentsMustBeIntegers)?;
-    let b = args[1].as_scalar().ok_or(MathError::ArgumentsMustBeIntegers)?;
+    let a = args[0]
+        .as_scalar()
+        .ok_or(MathError::ArgumentsMustBeIntegers)?;
+    let b = args[1]
+        .as_scalar()
+        .ok_or(MathError::ArgumentsMustBeIntegers)?;
     if !is_int(a) || !is_int(b) {
         return Err(MathError::ArgumentsMustBeIntegers);
     }
@@ -1228,7 +2091,9 @@ fn builtin_lcm(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
 }
 
 fn builtin_factorial(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let n = args[0].as_scalar().ok_or(MathError::InputMustBeNonnegativeInteger)?;
+    let n = args[0]
+        .as_scalar()
+        .ok_or(MathError::InputMustBeNonnegativeInteger)?;
     if !is_int(n) || n < 0.0 {
         return Err(MathError::InputMustBeNonnegativeInteger);
     }
@@ -1241,8 +2106,12 @@ fn builtin_factorial(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathV
 }
 
 fn builtin_nchoosek(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let n = args[0].as_scalar().ok_or(MathError::ArgumentsMustBeIntegers)?;
-    let k = args[1].as_scalar().ok_or(MathError::ArgumentsMustBeIntegers)?;
+    let n = args[0]
+        .as_scalar()
+        .ok_or(MathError::ArgumentsMustBeIntegers)?;
+    let k = args[1]
+        .as_scalar()
+        .ok_or(MathError::ArgumentsMustBeIntegers)?;
     if !is_int(n) || !is_int(k) {
         return Err(MathError::ArgumentsMustBeIntegers);
     }
@@ -1293,20 +2162,30 @@ fn builtin_isprime(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
             for &x in data {
                 out.push(check(x)?);
             }
-            Ok(MathValue::Matrix { rows: *rows, cols: *cols, data: out })
+            Ok(MathValue::Matrix {
+                rows: *rows,
+                cols: *cols,
+                data: out,
+            })
         }
         _ => Err(MathError::Other("isprime requires numeric input".into())),
     }
 }
 
 fn builtin_primes(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let n = args[0].as_scalar().ok_or(MathError::InputMustBeNonnegativeInteger)?;
+    let n = args[0]
+        .as_scalar()
+        .ok_or(MathError::InputMustBeNonnegativeInteger)?;
     if !is_int(n) || n < 0.0 {
         return Err(MathError::InputMustBeNonnegativeInteger);
     }
     let un = n as usize;
     if un < 2 {
-        return Ok(MathValue::Matrix { rows: 1, cols: 0, data: Vec::new() });
+        return Ok(MathValue::Matrix {
+            rows: 1,
+            cols: 0,
+            data: Vec::new(),
+        });
     }
     let mut is_p = vec![true; un + 1];
     is_p[0] = false;
@@ -1336,13 +2215,19 @@ fn builtin_primes(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValu
 }
 
 fn builtin_factor(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let n = args[0].as_scalar().ok_or(MathError::InputMustBeNonnegativeInteger)?;
+    let n = args[0]
+        .as_scalar()
+        .ok_or(MathError::InputMustBeNonnegativeInteger)?;
     if !is_int(n) || n < 0.0 {
         return Err(MathError::InputMustBeNonnegativeInteger);
     }
     let mut un = n as u64;
     if un <= 1 {
-        return Ok(MathValue::Matrix { rows: 1, cols: 1, data: vec![un as f64] });
+        return Ok(MathValue::Matrix {
+            rows: 1,
+            cols: 1,
+            data: vec![un as f64],
+        });
     }
     let mut res = Vec::new();
     while un % 2 == 0 {
@@ -1368,7 +2253,9 @@ fn builtin_factor(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValu
 }
 
 fn builtin_nthroot(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let n = args[1].as_scalar().ok_or(MathError::Other("nthroot: n must be scalar".into()))?;
+    let n = args[1]
+        .as_scalar()
+        .ok_or(MathError::Other("nthroot: n must be scalar".into()))?;
     if !is_int(n) || n == 0.0 {
         return Err(MathError::ArgumentsMustBeIntegers);
     }
@@ -1393,7 +2280,11 @@ fn builtin_nthroot(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
             for &x in data {
                 out.push(compute(x)?);
             }
-            Ok(MathValue::Matrix { rows: *rows, cols: *cols, data: out })
+            Ok(MathValue::Matrix {
+                rows: *rows,
+                cols: *cols,
+                data: out,
+            })
         }
         _ => Err(MathError::Other("nthroot: x must be numeric".into())),
     }
@@ -1427,22 +2318,28 @@ fn builtin_var(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
         for r in 0..rows {
             sq_sum += (val.get(r, c).unwrap() - mean).powi(2);
         }
-        let var = if rows > 1 { sq_sum / ((rows - 1) as f64) } else { 0.0 };
+        let var = if rows > 1 {
+            sq_sum / ((rows - 1) as f64)
+        } else {
+            0.0
+        };
         out.push(var);
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data: out })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data: out,
+    })
 }
 
 fn builtin_std(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     let var_val = builtin_var(args, ctx)?;
     match var_val {
-        MathValue::Matrix { rows, cols, data } => {
-            Ok(MathValue::Matrix {
-                rows,
-                cols,
-                data: data.into_iter().map(|x| x.sqrt()).collect(),
-            })
-        }
+        MathValue::Matrix { rows, cols, data } => Ok(MathValue::Matrix {
+            rows,
+            cols,
+            data: data.into_iter().map(|x| x.sqrt()).collect(),
+        }),
         _ => unreachable!(),
     }
 }
@@ -1476,7 +2373,11 @@ fn builtin_median(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValu
         }
         out.push(calc_median(col_data));
     }
-    Ok(MathValue::Matrix { rows: 1, cols, data: out })
+    Ok(MathValue::Matrix {
+        rows: 1,
+        cols,
+        data: out,
+    })
 }
 
 fn builtin_cumprod(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
@@ -1490,7 +2391,11 @@ fn builtin_cumprod(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
             prod *= x;
             out.push(prod);
         }
-        return Ok(MathValue::Matrix { rows, cols, data: out });
+        return Ok(MathValue::Matrix {
+            rows,
+            cols,
+            data: out,
+        });
     }
     // Column-wise cumulative product
     let mut data = vec![0.0; rows * cols];
@@ -1510,28 +2415,48 @@ fn builtin_diff(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
     if rows == 1 {
         let v = val.to_vector().unwrap();
         if v.len() <= 1 {
-            return Ok(MathValue::Matrix { rows: 1, cols: 0, data: Vec::new() });
+            return Ok(MathValue::Matrix {
+                rows: 1,
+                cols: 0,
+                data: Vec::new(),
+            });
         }
         let mut out = Vec::with_capacity(v.len() - 1);
         for i in 0..(v.len() - 1) {
             out.push(v[i + 1] - v[i]);
         }
-        return Ok(MathValue::Matrix { rows: 1, cols: out.len(), data: out });
+        return Ok(MathValue::Matrix {
+            rows: 1,
+            cols: out.len(),
+            data: out,
+        });
     }
     if cols == 1 {
         let v = val.to_vector().unwrap();
         if v.len() <= 1 {
-            return Ok(MathValue::Matrix { rows: 0, cols: 1, data: Vec::new() });
+            return Ok(MathValue::Matrix {
+                rows: 0,
+                cols: 1,
+                data: Vec::new(),
+            });
         }
         let mut out = Vec::with_capacity(v.len() - 1);
         for i in 0..(v.len() - 1) {
             out.push(v[i + 1] - v[i]);
         }
-        return Ok(MathValue::Matrix { rows: out.len(), cols: 1, data: out });
+        return Ok(MathValue::Matrix {
+            rows: out.len(),
+            cols: 1,
+            data: out,
+        });
     }
     // Matrix: diff down rows -> (rows - 1) x cols
     if rows <= 1 {
-        return Ok(MathValue::Matrix { rows: 0, cols: 0, data: Vec::new() });
+        return Ok(MathValue::Matrix {
+            rows: 0,
+            cols: 0,
+            data: Vec::new(),
+        });
     }
     let new_rows = rows - 1;
     let mut data = vec![0.0; new_rows * cols];
@@ -1541,13 +2466,23 @@ fn builtin_diff(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue,
             data[c * new_rows + r] = diff_val;
         }
     }
-    Ok(MathValue::Matrix { rows: new_rows, cols, data })
+    Ok(MathValue::Matrix {
+        rows: new_rows,
+        cols,
+        data,
+    })
 }
 
 fn builtin_polyfit(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let x = args[0].to_vector().ok_or(MathError::Other("polyfit: x must be a vector".into()))?;
-    let y = args[1].to_vector().ok_or(MathError::Other("polyfit: y must be a vector".into()))?;
-    let n_f = args[2].as_scalar().ok_or(MathError::Other("polyfit: n must be a scalar".into()))?;
+    let x = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("polyfit: x must be a vector".into()))?;
+    let y = args[1]
+        .to_vector()
+        .ok_or(MathError::Other("polyfit: y must be a vector".into()))?;
+    let n_f = args[2]
+        .as_scalar()
+        .ok_or(MathError::Other("polyfit: n must be a scalar".into()))?;
     if !is_int(n_f) || n_f < 0.0 {
         return Err(MathError::InputMustBeNonnegativeInteger);
     }
@@ -1558,7 +2493,9 @@ fn builtin_polyfit(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
     let m = x.len();
     let k = n + 1; // number of coefficients
     if m < k {
-        return Err(MathError::Other("polyfit: insufficient points for degree".into()));
+        return Err(MathError::Other(
+            "polyfit: insufficient points for degree".into(),
+        ));
     }
 
     // Build Vandermonde matrix V of size m x k: V[i, j] = x[i]^(n - j)
@@ -1591,7 +2528,9 @@ fn builtin_polyfit(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
 }
 
 fn builtin_polyval(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let p = args[0].to_vector().ok_or(MathError::Other("polyval: p must be vector of coefficients".into()))?;
+    let p = args[0].to_vector().ok_or(MathError::Other(
+        "polyval: p must be vector of coefficients".into(),
+    ))?;
     let x_val = &args[1];
 
     let eval_p = |x: f64| -> f64 {
@@ -1608,19 +2547,29 @@ fn builtin_polyval(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
             for &x in data {
                 out.push(eval_p(x));
             }
-            Ok(MathValue::Matrix { rows: *rows, cols: *cols, data: out })
+            Ok(MathValue::Matrix {
+                rows: *rows,
+                cols: *cols,
+                data: out,
+            })
         }
         _ => Err(MathError::Other("polyval: x must be numeric".into())),
     }
 }
 
 fn builtin_roots(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let mut p = args[0].to_vector().ok_or(MathError::Other("roots: input must be vector of coefficients".into()))?;
+    let mut p = args[0].to_vector().ok_or(MathError::Other(
+        "roots: input must be vector of coefficients".into(),
+    ))?;
     while !p.is_empty() && p[0].abs() < 1e-12 {
         p.remove(0);
     }
     if p.len() <= 1 {
-        return Ok(MathValue::Matrix { rows: 0, cols: 1, data: Vec::new() });
+        return Ok(MathValue::Matrix {
+            rows: 0,
+            cols: 1,
+            data: Vec::new(),
+        });
     }
     let lead = p[0];
     for x in &mut p {
@@ -1630,7 +2579,11 @@ fn builtin_roots(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
     let degree = p.len() - 1;
     if degree == 1 {
         let r = -p[1];
-        return Ok(MathValue::Matrix { rows: 1, cols: 1, data: vec![r] });
+        return Ok(MathValue::Matrix {
+            rows: 1,
+            cols: 1,
+            data: vec![r],
+        });
     }
     if degree == 2 {
         let b = p[1];
@@ -1645,7 +2598,11 @@ fn builtin_roots(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
         let r2 = (-b - sqrt_d) / 2.0;
         let mut roots = vec![r1, r2];
         roots.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-        return Ok(MathValue::Matrix { rows: 2, cols: 1, data: roots });
+        return Ok(MathValue::Matrix {
+            rows: 2,
+            cols: 1,
+            data: roots,
+        });
     }
 
     // Companion matrix of size degree x degree
@@ -1777,7 +2734,11 @@ pub fn compute_real_eigenvalues(matrix: &[Vec<f64>]) -> Result<Vec<f64>, MathErr
         let shift = if disc >= 0.0 {
             let s1 = (tr + disc.sqrt()) / 2.0;
             let s2 = (tr - disc.sqrt()) / 2.0;
-            if (s1 - d).abs() < (s2 - d).abs() { s1 } else { s2 }
+            if (s1 - d).abs() < (s2 - d).abs() {
+                s1
+            } else {
+                s2
+            }
         } else {
             d
         };
@@ -1845,7 +2806,9 @@ pub fn compute_real_eigenvalues(matrix: &[Vec<f64>]) -> Result<Vec<f64>, MathErr
 
 fn builtin_trapz(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if args.len() == 1 {
-        let y = args[0].to_vector().ok_or(MathError::Other("trapz: y must be a vector".into()))?;
+        let y = args[0]
+            .to_vector()
+            .ok_or(MathError::Other("trapz: y must be a vector".into()))?;
         if y.len() < 2 {
             return Ok(MathValue::scalar(0.0));
         }
@@ -1855,8 +2818,12 @@ fn builtin_trapz(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
         }
         return Ok(MathValue::scalar(area));
     }
-    let x = args[0].to_vector().ok_or(MathError::Other("trapz: x must be a vector".into()))?;
-    let y = args[1].to_vector().ok_or(MathError::Other("trapz: y must be a vector".into()))?;
+    let x = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("trapz: x must be a vector".into()))?;
+    let y = args[1]
+        .to_vector()
+        .ok_or(MathError::Other("trapz: y must be a vector".into()))?;
     if x.len() != y.len() {
         return Err(MathError::VectorsMustBeSameLength);
     }
@@ -1872,8 +2839,12 @@ fn builtin_trapz(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
 }
 
 fn builtin_dot(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let a = args[0].to_vector().ok_or(MathError::Other("dot: a must be a vector".into()))?;
-    let b = args[1].to_vector().ok_or(MathError::Other("dot: b must be a vector".into()))?;
+    let a = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("dot: a must be a vector".into()))?;
+    let b = args[1]
+        .to_vector()
+        .ok_or(MathError::Other("dot: b must be a vector".into()))?;
     if a.len() != b.len() {
         return Err(MathError::VectorsMustBeSameLength);
     }
@@ -1882,19 +2853,19 @@ fn builtin_dot(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
 }
 
 fn builtin_cross(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let a = args[0].to_vector().ok_or(MathError::CrossRequires3ElementVectors)?;
-    let b = args[1].to_vector().ok_or(MathError::CrossRequires3ElementVectors)?;
+    let a = args[0]
+        .to_vector()
+        .ok_or(MathError::CrossRequires3ElementVectors)?;
+    let b = args[1]
+        .to_vector()
+        .ok_or(MathError::CrossRequires3ElementVectors)?;
     if a.len() != 3 || b.len() != 3 {
         return Err(MathError::CrossRequires3ElementVectors);
     }
     let c0 = a[1] * b[2] - a[2] * b[1];
     let c1 = a[2] * b[0] - a[0] * b[2];
     let c2 = a[0] * b[1] - a[1] * b[0];
-    let (rows, cols) = if args[0].rows() == 1 {
-        (1, 3)
-    } else {
-        (3, 1)
-    };
+    let (rows, cols) = if args[0].rows() == 1 { (1, 3) } else { (3, 1) };
     Ok(MathValue::Matrix {
         rows,
         cols,
@@ -1904,15 +2875,21 @@ fn builtin_cross(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue
 
 fn builtin_reshape(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     let a = &args[0];
-    let r_f = args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
-    let c_f = args[2].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)?;
+    let r_f = args[1]
+        .as_scalar()
+        .ok_or(MathError::IndexMustBePositiveInteger)?;
+    let c_f = args[2]
+        .as_scalar()
+        .ok_or(MathError::IndexMustBePositiveInteger)?;
     if !is_int(r_f) || !is_int(c_f) || r_f < 1.0 || c_f < 1.0 {
         return Err(MathError::IndexMustBePositiveInteger);
     }
     let r = r_f as usize;
     let c = c_f as usize;
     if r * c != a.numel() {
-        return Err(MathError::Other("To RESHAPE the number of elements must not change.".into()));
+        return Err(MathError::Other(
+            "To RESHAPE the number of elements must not change.".into(),
+        ));
     }
     match a {
         MathValue::Matrix { data, .. } => Ok(MathValue::Matrix {
@@ -1920,7 +2897,9 @@ fn builtin_reshape(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
             cols: c,
             data: data.clone(),
         }),
-        _ => Err(MathError::Other("reshape not supported on non-matrix types".into())),
+        _ => Err(MathError::Other(
+            "reshape not supported on non-matrix types".into(),
+        )),
     }
 }
 
@@ -1936,7 +2915,11 @@ fn builtin_fliplr(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValu
                     new_data[target_c * rows + r] = data[c * rows + r];
                 }
             }
-            Ok(MathValue::Matrix { rows, cols, data: new_data })
+            Ok(MathValue::Matrix {
+                rows,
+                cols,
+                data: new_data,
+            })
         }
         MathValue::Str(s) => {
             let rev: String = s.chars().rev().collect();
@@ -1958,14 +2941,20 @@ fn builtin_flipud(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValu
                     new_data[c * rows + target_r] = data[c * rows + r];
                 }
             }
-            Ok(MathValue::Matrix { rows, cols, data: new_data })
+            Ok(MathValue::Matrix {
+                rows,
+                cols,
+                data: new_data,
+            })
         }
         _ => Ok(a.clone()),
     }
 }
 
 fn builtin_rng(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let s = args[0].as_scalar().ok_or(MathError::InputMustBeNonnegativeInteger)?;
+    let s = args[0]
+        .as_scalar()
+        .ok_or(MathError::InputMustBeNonnegativeInteger)?;
     if !is_int(s) || s < 0.0 {
         return Err(MathError::InputMustBeNonnegativeInteger);
     }
@@ -1974,7 +2963,9 @@ fn builtin_rng(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, M
 }
 
 fn builtin_randi(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let n_f = args[0].as_scalar().ok_or(MathError::InputMustBeNonnegativeInteger)?;
+    let n_f = args[0]
+        .as_scalar()
+        .ok_or(MathError::InputMustBeNonnegativeInteger)?;
     if !is_int(n_f) || n_f < 1.0 {
         return Err(MathError::InputMustBeNonnegativeInteger);
     }
@@ -1983,16 +2974,24 @@ fn builtin_randi(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue,
     let (rows, cols) = if args.len() == 1 {
         (1, 1)
     } else if args.len() == 2 {
-        let r = args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+        let r = args[1]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
         (r, r)
     } else {
-        let r = args[1].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
-        let c = args[2].as_scalar().ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+        let r = args[1]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
+        let c = args[2]
+            .as_scalar()
+            .ok_or(MathError::IndexMustBePositiveInteger)? as usize;
         (r, c)
     };
 
     let next_rand = |seed: &mut u64| -> f64 {
-        *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let val = (*seed >> 11) as f64;
         val / 9007199254740992.0
     };
@@ -2032,70 +3031,92 @@ fn builtin_num2str(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathVal
 fn builtin_bar(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
     let (x, y) = if args.len() == 1 {
-        let y_vec = args[0].to_vector().ok_or(MathError::Other("bar(y): y must be a vector".into()))?;
+        let y_vec = args[0]
+            .to_vector()
+            .ok_or(MathError::Other("bar(y): y must be a vector".into()))?;
         let x_vec: Vec<f64> = (1..=y_vec.len()).map(|i| i as f64).collect();
         (x_vec, y_vec)
     } else {
-        let x_vec = args[0].to_vector().ok_or(MathError::Other("bar(x, y): x must be a vector".into()))?;
-        let y_vec = args[1].to_vector().ok_or(MathError::Other("bar(x, y): y must be a vector".into()))?;
+        let x_vec = args[0]
+            .to_vector()
+            .ok_or(MathError::Other("bar(x, y): x must be a vector".into()))?;
+        let y_vec = args[1]
+            .to_vector()
+            .ok_or(MathError::Other("bar(x, y): y must be a vector".into()))?;
         if x_vec.len() != y_vec.len() {
             return Err(MathError::VectorsMustBeSameLength);
         }
         (x_vec, y_vec)
     };
 
-    ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-        x: x.clone(),
-        y: y.clone(),
-        color: [0, 114, 189, 255],
-        label: "bar".to_string(),
-        line_style: "-".to_string(),
-        marker: "".to_string(),
-        kind: crate::math_engine::eval::CurveKind::Bar,
-    });
+    ctx.current_figure_curves
+        .push(crate::math_engine::eval::CurveInfo {
+            x: x.clone(),
+            y: y.clone(),
+            color: [0, 114, 189, 255],
+            label: "bar".to_string(),
+            line_style: "-".to_string(),
+            marker: "".to_string(),
+            kind: crate::math_engine::eval::CurveKind::Bar,
+        });
 
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::Bar {
-        x,
-        y,
-        is_hold: *ctx.hold_on,
-    });
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::Bar {
+            x,
+            y,
+            is_hold: *ctx.hold_on,
+        });
     Ok(MathValue::empty())
 }
 
 fn builtin_hist(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
-    let v = args[0].to_vector().ok_or(MathError::Other("hist: input must be a vector".into()))?;
+    let v = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("hist: input must be a vector".into()))?;
     let nbins = if args.len() >= 2 {
-        args[1].as_scalar().ok_or(MathError::Other("hist: nbins must be scalar".into()))? as usize
+        args[1]
+            .as_scalar()
+            .ok_or(MathError::Other("hist: nbins must be scalar".into()))? as usize
     } else {
         10
     };
 
-    ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-        x: v.clone(),
-        y: Vec::new(),
-        color: [0, 114, 189, 255],
-        label: "hist".to_string(),
-        line_style: "-".to_string(),
-        marker: "".to_string(),
-        kind: crate::math_engine::eval::CurveKind::Hist,
-    });
+    ctx.current_figure_curves
+        .push(crate::math_engine::eval::CurveInfo {
+            x: v.clone(),
+            y: Vec::new(),
+            color: [0, 114, 189, 255],
+            label: "hist".to_string(),
+            line_style: "-".to_string(),
+            marker: "".to_string(),
+            kind: crate::math_engine::eval::CurveKind::Hist,
+        });
 
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::Hist {
-        v,
-        nbins,
-        is_hold: *ctx.hold_on,
-    });
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::Hist {
+            v,
+            nbins,
+            is_hold: *ctx.hold_on,
+        });
     Ok(MathValue::empty())
 }
 
@@ -2108,87 +3129,121 @@ fn builtin_pie(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, M
         }
     }
 
-    let v = args[0].to_vector().ok_or(MathError::Other("pie: input must be a vector".into()))?;
+    let v = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("pie: input must be a vector".into()))?;
 
-    ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-        x: v.clone(),
-        y: Vec::new(),
-        color: [0, 114, 189, 255],
-        label: "pie".to_string(),
-        line_style: "".to_string(),
-        marker: "".to_string(),
-        kind: crate::math_engine::eval::CurveKind::Pie,
-    });
+    ctx.current_figure_curves
+        .push(crate::math_engine::eval::CurveInfo {
+            x: v.clone(),
+            y: Vec::new(),
+            color: [0, 114, 189, 255],
+            label: "pie".to_string(),
+            line_style: "".to_string(),
+            marker: "".to_string(),
+            kind: crate::math_engine::eval::CurveKind::Pie,
+        });
 
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::Pie { v });
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::Pie { v });
     Ok(MathValue::empty())
 }
 
 fn builtin_scatter(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
-    let x = args[0].to_vector().ok_or(MathError::Other("scatter: x must be a vector".into()))?;
-    let y = args[1].to_vector().ok_or(MathError::Other("scatter: y must be a vector".into()))?;
+    let x = args[0]
+        .to_vector()
+        .ok_or(MathError::Other("scatter: x must be a vector".into()))?;
+    let y = args[1]
+        .to_vector()
+        .ok_or(MathError::Other("scatter: y must be a vector".into()))?;
     if x.len() != y.len() {
         return Err(MathError::VectorsMustBeSameLength);
     }
 
-    ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-        x: x.clone(),
-        y: y.clone(),
-        color: [0, 114, 189, 255],
-        label: "scatter".to_string(),
-        line_style: "".to_string(),
-        marker: "o".to_string(),
-        kind: crate::math_engine::eval::CurveKind::Scatter,
-    });
+    ctx.current_figure_curves
+        .push(crate::math_engine::eval::CurveInfo {
+            x: x.clone(),
+            y: y.clone(),
+            color: [0, 114, 189, 255],
+            label: "scatter".to_string(),
+            line_style: "".to_string(),
+            marker: "o".to_string(),
+            kind: crate::math_engine::eval::CurveKind::Scatter,
+        });
 
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::Scatter {
-        x,
-        y,
-        is_hold: *ctx.hold_on,
-    });
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::Scatter {
+            x,
+            y,
+            is_hold: *ctx.hold_on,
+        });
     Ok(MathValue::empty())
 }
 
 fn builtin_xline(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
-    let v = args[0].as_scalar().ok_or(MathError::Other("xline: argument must be scalar".into()))?;
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::XLine(v));
+    let v = args[0]
+        .as_scalar()
+        .ok_or(MathError::Other("xline: argument must be scalar".into()))?;
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::XLine(v));
     Ok(MathValue::empty())
 }
 
 fn builtin_yline(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
-    let v = args[0].as_scalar().ok_or(MathError::Other("yline: argument must be scalar".into()))?;
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::YLine(v));
+    let v = args[0]
+        .as_scalar()
+        .ok_or(MathError::Other("yline: argument must be scalar".into()))?;
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::YLine(v));
     Ok(MathValue::empty())
 }
 
 fn builtin_axis(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     match &args[0] {
         MathValue::Str(s) if s == "equal" => {
-            ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetAxisEqual);
+            ctx.canvas_commands
+                .push(crate::math_engine::eval::CanvasCommand::SetAxisEqual);
         }
         MathValue::Matrix { data, .. } => {
             if data.len() == 4 {
-                ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::SetAxisLimits(data.clone()));
+                ctx.canvas_commands
+                    .push(crate::math_engine::eval::CanvasCommand::SetAxisLimits(
+                        data.clone(),
+                    ));
             } else {
-                return Err(MathError::Other("axis requires 4 elements [xmin xmax ymin ymax]".into()));
+                return Err(MathError::Other(
+                    "axis requires 4 elements [xmin xmax ymin ymax]".into(),
+                ));
             }
         }
         _ => return Err(MathError::Other("axis: invalid argument".into())),
@@ -2197,13 +3252,18 @@ fn builtin_axis(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, 
 }
 
 fn builtin_text(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
-    let x = args[0].as_scalar().ok_or(MathError::Other("text: x must be scalar".into()))?;
-    let y = args[1].as_scalar().ok_or(MathError::Other("text: y must be scalar".into()))?;
+    let x = args[0]
+        .as_scalar()
+        .ok_or(MathError::Other("text: x must be scalar".into()))?;
+    let y = args[1]
+        .as_scalar()
+        .ok_or(MathError::Other("text: y must be scalar".into()))?;
     let text = match &args[2] {
         MathValue::Str(s) => s.clone(),
         val => val.to_display_string(),
     };
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::DrawText { x, y, text });
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::DrawText { x, y, text });
     Ok(MathValue::empty())
 }
 
@@ -2227,7 +3287,9 @@ fn builtin_eig(args: &[MathValue], _ctx: &mut EvalContext) -> Result<MathValue, 
 
 fn builtin_fplot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue, MathError> {
     let fn_val = &args[0];
-    let interval = args[1].to_vector().ok_or(MathError::Other("fplot: interval must be [a b]".into()))?;
+    let interval = args[1]
+        .to_vector()
+        .ok_or(MathError::Other("fplot: interval must be [a b]".into()))?;
     if interval.len() != 2 {
         return Err(MathError::Other("fplot: interval requires [a b]".into()));
     }
@@ -2241,7 +3303,9 @@ fn builtin_fplot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue,
     match fn_val {
         MathValue::AnonymousFn { params, body } => {
             if params.len() != 1 {
-                return Err(MathError::Other("fplot: anonymous function must take 1 argument".into()));
+                return Err(MathError::Other(
+                    "fplot: anonymous function must take 1 argument".into(),
+                ));
             }
             let param_name = &params[0];
             let mut eval = crate::math_engine::eval::Evaluator::new();
@@ -2256,12 +3320,20 @@ fn builtin_fplot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue,
                 y_vec.push(y);
             }
         }
-        _ => return Err(MathError::Other("fplot requires function handle as first argument".into())),
+        _ => {
+            return Err(MathError::Other(
+                "fplot requires function handle as first argument".into(),
+            ))
+        }
     }
 
     if !*ctx.hold_on {
         ctx.current_figure_curves.clear();
-    } else if ctx.current_figure_curves.iter().any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie) {
+    } else if ctx
+        .current_figure_curves
+        .iter()
+        .any(|c| c.kind == crate::math_engine::eval::CurveKind::Pie)
+    {
         return Err(MathError::PieCannotBeCombined);
     }
 
@@ -2277,25 +3349,27 @@ fn builtin_fplot(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValue,
     let curve_idx = ctx.current_figure_curves.len();
     let color = default_palette[curve_idx % default_palette.len()];
 
-    ctx.current_figure_curves.push(crate::math_engine::eval::CurveInfo {
-        x: x_vec.clone(),
-        y: y_vec.clone(),
-        color,
-        label: format!("data{}", curve_idx + 1),
-        line_style: "-".to_string(),
-        marker: "".to_string(),
-        kind: crate::math_engine::eval::CurveKind::Plot,
-    });
+    ctx.current_figure_curves
+        .push(crate::math_engine::eval::CurveInfo {
+            x: x_vec.clone(),
+            y: y_vec.clone(),
+            color,
+            label: String::new(),
+            line_style: "-".to_string(),
+            marker: "".to_string(),
+            kind: crate::math_engine::eval::CurveKind::Plot,
+        });
 
-    ctx.canvas_commands.push(crate::math_engine::eval::CanvasCommand::PlotCurve {
-        x: x_vec,
-        y: y_vec,
-        label: format!("data{}", curve_idx + 1),
-        color,
-        line_style: "-".to_string(),
-        marker: "".to_string(),
-        is_hold: *ctx.hold_on,
-    });
+    ctx.canvas_commands
+        .push(crate::math_engine::eval::CanvasCommand::PlotCurve {
+            x: x_vec,
+            y: y_vec,
+            label: String::new(),
+            color,
+            line_style: "-".to_string(),
+            marker: "".to_string(),
+            is_hold: *ctx.hold_on,
+        });
 
     Ok(MathValue::empty())
 }
@@ -2335,7 +3409,9 @@ fn builtin_fprintf(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValu
 
             let mut spec = String::new();
             let mut j = i + 1;
-            while j < chars.len() && (chars[j].is_ascii_digit() || chars[j] == '.' || chars[j] == '-') {
+            while j < chars.len()
+                && (chars[j].is_ascii_digit() || chars[j] == '.' || chars[j] == '-')
+            {
                 spec.push(chars[j]);
                 j += 1;
             }
@@ -2352,7 +3428,9 @@ fn builtin_fprintf(args: &[MathValue], ctx: &mut EvalContext) -> Result<MathValu
                     }
                     'f' => {
                         let num = val_opt.and_then(|v| v.as_scalar()).unwrap_or(0.0);
-                        if let Some(precision) = spec.strip_prefix('.').and_then(|p| p.parse::<usize>().ok()) {
+                        if let Some(precision) =
+                            spec.strip_prefix('.').and_then(|p| p.parse::<usize>().ok())
+                        {
                             out.push_str(&format!("{:.prec$}", num, prec = precision));
                         } else {
                             out.push_str(&format!("{:.6}", num));

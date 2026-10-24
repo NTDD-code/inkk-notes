@@ -223,12 +223,8 @@ impl StabilizerPipeline {
         if !self.is_initialized {
             self.reset(raw_x, raw_y, raw_pressure);
             self.last_timestamp_sec = timestamp_sec;
-            let thickness = compute_thickness(
-                pen_type,
-                base_thickness,
-                0.0,
-                pressure_curve(raw_pressure),
-            );
+            let thickness =
+                compute_thickness(pen_type, base_thickness, 0.0, pressure_curve(raw_pressure));
             return Some(Point::with_thickness(raw_x, raw_y, raw_pressure, thickness));
         }
 

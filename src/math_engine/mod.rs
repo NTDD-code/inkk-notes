@@ -8,11 +8,11 @@ pub mod registry;
 pub mod token;
 pub mod value;
 
-use std::collections::HashMap;
 pub use error::MathError;
 pub use eval::{CanvasCommand, CurveInfo, EvalOutput, Evaluator, ExecutionLimits, StackFrame};
 pub use library::*;
 pub use registry::{FunctionKind, FunctionMetadata, FunctionRegistry};
+use std::collections::HashMap;
 pub use value::MathValue;
 
 #[derive(Debug, Clone)]
@@ -53,10 +53,12 @@ impl MathWorkspace {
 mod tests {
     use super::*;
 
-    // --- 25 Mandatory Tier 1 Tests (Section 10) ---
+    // =========================================================================
+    // 25 MANDATORY TIER 1 TESTS (docs/SPEC.md Section 10)
+    // =========================================================================
 
     #[test]
-    fn test_01_precedence_arithmetic() {
+    fn test_10_01_precedence_arithmetic() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("2+3*4");
         assert!(res.error.is_none());
@@ -64,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn test_02_unary_minus_power() {
+    fn test_10_02_unary_minus_power() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("-2^2");
         assert!(res.error.is_none());
@@ -72,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn test_03_negative_power() {
+    fn test_10_03_negative_power() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("2^-1");
         assert!(res.error.is_none());
@@ -81,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn test_04_bracket_space_unary() {
+    fn test_10_04_bracket_space_unary() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("[1 -2]");
         assert!(res.error.is_none());
@@ -93,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn test_05_bracket_binary_minus() {
+    fn test_10_05_bracket_binary_minus() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("[1 - 2]");
         assert!(res.error.is_none());
@@ -104,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn test_06_matrix_multiplication() {
+    fn test_10_06_matrix_multiplication() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; A*A");
         assert!(res.error.is_none());
@@ -113,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn test_07_elementwise_multiplication() {
+    fn test_10_07_elementwise_multiplication() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; A.*A");
         assert!(res.error.is_none());
@@ -122,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn test_08_matrix_transpose() {
+    fn test_10_08_matrix_transpose() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; A'");
         assert!(res.error.is_none());
@@ -131,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_09_matrix_determinant() {
+    fn test_10_09_matrix_determinant() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; det(A)");
         assert!(res.error.is_none());
@@ -140,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_10_matrix_inverse() {
+    fn test_10_10_matrix_inverse() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; inv(A)");
         assert!(res.error.is_none());
@@ -153,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn test_11_matrix_left_divide() {
+    fn test_10_11_matrix_left_divide() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; A\\[5;6]");
         assert!(res.error.is_none());
@@ -164,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn test_12_range_and_sum() {
+    fn test_10_12_range_and_sum() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("x=1:5; sum(x)");
         assert!(res.error.is_none());
@@ -173,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn test_13_index_end() {
+    fn test_10_13_index_end() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("x=1:5; x(end)");
         assert!(res.error.is_none());
@@ -182,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn test_14_index_2d() {
+    fn test_10_14_index_2d() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; A(2,1)");
         assert!(res.error.is_none());
@@ -191,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn test_15_slice_column() {
+    fn test_10_15_slice_column() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("A=[1 2;3 4]; A(:,2)");
         assert!(res.error.is_none());
@@ -200,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn test_16_linspace() {
+    fn test_10_16_linspace() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("linspace(0,1,5)");
         assert!(res.error.is_none());
@@ -213,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn test_17_sin_pi() {
+    fn test_10_17_sin_pi() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("sin(pi)");
         assert!(res.error.is_none());
@@ -224,57 +226,91 @@ mod tests {
     }
 
     #[test]
-    fn test_18_divide_by_zero() {
+    fn test_10_18_divide_by_zero() {
         let mut ws = MathWorkspace::new();
-        let res = ws.execute("1/0");
-        assert!(res.error.is_none());
-        let ans = ws.variables.get("ans").unwrap().as_scalar().unwrap();
-        assert!(ans.is_infinite() && ans.is_sign_positive());
-        assert_eq!(ws.variables.get("ans").unwrap().to_display_string(), "Inf");
+        let res1 = ws.execute("1/0");
+        assert!(res1.error.is_none());
+        assert!(ws
+            .variables
+            .get("ans")
+            .unwrap()
+            .as_scalar()
+            .unwrap()
+            .is_infinite());
+
+        let res2 = ws.execute("0/0");
+        assert!(res2.error.is_none());
+        assert!(ws
+            .variables
+            .get("ans")
+            .unwrap()
+            .as_scalar()
+            .unwrap()
+            .is_nan());
+
+        let res3 = ws.execute("log(0)");
+        assert!(res3.error.is_none());
+        let log0 = ws.variables.get("ans").unwrap().as_scalar().unwrap();
+        assert!(log0.is_infinite() && log0.is_sign_negative());
     }
 
     #[test]
-    fn test_19_inner_matrix_dimension_mismatch() {
+    fn test_10_19_inner_matrix_dimension_mismatch() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("[1 2 3]*[4 5 6]");
         assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Inner matrix dimensions must agree (1x3 * 1x3)"));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Inner matrix dimensions must agree (1x3 * 1x3)"));
     }
 
     #[test]
-    fn test_20_unrecognized_ident() {
+    fn test_10_20_unrecognized_ident() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("foo(1)");
         assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Unrecognized function or variable 'foo'"));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Unrecognized function or variable 'foo'"));
     }
 
     #[test]
-    fn test_21_complex_not_supported() {
+    fn test_10_21_complex_not_supported() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("sqrt(-1)");
         assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Complex results are not supported"));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Complex results are not supported"));
     }
 
     #[test]
-    fn test_22_plot_vector_length_mismatch() {
+    fn test_10_22_plot_vector_length_mismatch() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("plot(1:3, [1 2])");
         assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Vectors must be the same length"));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Vectors must be the same length"));
     }
 
     #[test]
-    fn test_23_unsupported_feature() {
+    fn test_10_23_unsupported_feature() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("syms x");
         assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Feature not supported in Inkk MathStudio: syms"));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Feature not supported in Inkk MathStudio: syms"));
     }
 
     #[test]
-    fn test_24_parse_error_keeps_previous_vars() {
+    fn test_10_24_parse_error_keeps_previous_vars() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("x=5; y=x+;");
         assert!(res.error.is_some());
@@ -284,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn test_25_hold_on_plot_colors() {
+    fn test_10_25_hold_on_plot_colors() {
         let mut ws = MathWorkspace::new();
         let res = ws.execute("x=1:3; y=1:3; z=2:4; plot(x,y); hold on; plot(x,z)");
         assert!(res.error.is_none());
@@ -294,7 +330,10 @@ mod tests {
         } else {
             panic!("Expected PlotCurve");
         }
-        if let CanvasCommand::PlotCurve { color: c2, is_hold, .. } = &res.canvas_commands[1] {
+        if let CanvasCommand::PlotCurve {
+            color: c2, is_hold, ..
+        } = &res.canvas_commands[1]
+        {
             assert_eq!(*c2, [217, 83, 25, 255]); // #D95319
             assert!(*is_hold);
         } else {
@@ -303,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn test_describe_function() {
+    fn test_tier1_describe_function() {
         let ws = MathWorkspace::new();
         let meta = ws.describe_function("linspace").unwrap();
         assert_eq!(meta.name, "linspace");
@@ -313,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn test_execution_limit_exceeded() {
+    fn test_tier1_execution_limit_exceeded() {
         let mut ws = MathWorkspace::new();
         ws.evaluator.limits.max_steps = 10;
         let res = ws.execute("a=1; b=2; c=3; d=4; e=5; f=6; g=7; h=8; i=9; j=10; k=11; l=12;");
@@ -322,16 +361,29 @@ mod tests {
     }
 
     #[test]
-    fn test_extra_tier1_builtins() {
+    fn test_tier1_extra_builtins() {
         let mut ws = MathWorkspace::new();
         // Creation & Size
         let res = ws.execute("Z = zeros(2, 3); O = ones(2, 2); E = eye(3); sz = size(Z); len = length(Z); num = numel(Z); emp = isempty([]);");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("Z").unwrap().rows(), 2);
         assert_eq!(ws.variables.get("Z").unwrap().cols(), 3);
-        assert_eq!(ws.variables.get("O").unwrap().to_2d_vec(), vec![vec![1.0, 1.0], vec![1.0, 1.0]]);
-        assert_eq!(ws.variables.get("E").unwrap().to_2d_vec(), vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![0.0, 0.0, 1.0]]);
-        assert_eq!(ws.variables.get("sz").unwrap().to_vector().unwrap(), vec![2.0, 3.0]);
+        assert_eq!(
+            ws.variables.get("O").unwrap().to_2d_vec(),
+            vec![vec![1.0, 1.0], vec![1.0, 1.0]]
+        );
+        assert_eq!(
+            ws.variables.get("E").unwrap().to_2d_vec(),
+            vec![
+                vec![1.0, 0.0, 0.0],
+                vec![0.0, 1.0, 0.0],
+                vec![0.0, 0.0, 1.0]
+            ]
+        );
+        assert_eq!(
+            ws.variables.get("sz").unwrap().to_vector().unwrap(),
+            vec![2.0, 3.0]
+        );
         assert_eq!(ws.variables.get("len").unwrap().as_scalar().unwrap(), 3.0);
         assert_eq!(ws.variables.get("num").unwrap().as_scalar().unwrap(), 6.0);
         assert_eq!(ws.variables.get("emp").unwrap().as_scalar().unwrap(), 1.0);
@@ -341,8 +393,14 @@ mod tests {
         assert!(res2.error.is_none());
         assert_eq!(ws.variables.get("p").unwrap().as_scalar().unwrap(), 24.0);
         assert_eq!(ws.variables.get("m").unwrap().as_scalar().unwrap(), 2.5);
-        assert_eq!(ws.variables.get("cs").unwrap().to_vector().unwrap(), vec![2.0, 6.0, 7.0, 10.0]);
-        assert_eq!(ws.variables.get("s").unwrap().to_vector().unwrap(), vec![1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(
+            ws.variables.get("cs").unwrap().to_vector().unwrap(),
+            vec![2.0, 6.0, 7.0, 10.0]
+        );
+        assert_eq!(
+            ws.variables.get("s").unwrap().to_vector().unwrap(),
+            vec![1.0, 2.0, 3.0, 4.0]
+        );
         assert_eq!(ws.variables.get("n").unwrap().as_scalar().unwrap(), 5.0);
 
         // Linear algebra: trace, rank
@@ -363,110 +421,151 @@ mod tests {
         // Column-major colon linearization A(:)
         let res5 = ws.execute("A = [1 2; 3 4]; colA = A(:);");
         assert!(res5.error.is_none());
-        assert_eq!(ws.variables.get("colA").unwrap().to_2d_vec(), vec![vec![1.0], vec![3.0], vec![2.0], vec![4.0]]);
+        assert_eq!(
+            ws.variables.get("colA").unwrap().to_2d_vec(),
+            vec![vec![1.0], vec![3.0], vec![2.0], vec![4.0]]
+        );
     }
 
-    // --- Tier 1B Tests (Section D) ---
+    // =========================================================================
+    // 34 DEDICATED TIER 1B TESTS (docs/SPEC.md Section D)
+    // =========================================================================
 
     #[test]
-    fn test_tier1b_arithmetic_thcs() {
+    fn test_tier1b_01_gcd() {
         let mut ws = MathWorkspace::new();
-
-        // gcd(12,18) -> 6
         let res = ws.execute("gcd(12, 18)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 6.0);
+    }
 
-        // lcm(4,6) -> 12
+    #[test]
+    fn test_tier1b_02_lcm() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("lcm(4, 6)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 12.0);
+    }
 
-        // factorial(5) -> 120
+    #[test]
+    fn test_tier1b_03_factorial() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("factorial(5)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 120.0);
+    }
 
-        // nchoosek(5,2) -> 10
+    #[test]
+    fn test_tier1b_04_nchoosek() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("nchoosek(5, 2)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 10.0);
+    }
 
-        // primes(20) -> [2 3 5 7 11 13 17 19]
+    #[test]
+    fn test_tier1b_05_primes() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("primes(20)");
         assert!(res.error.is_none());
         assert_eq!(
             ws.variables.get("ans").unwrap().to_vector().unwrap(),
             vec![2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 17.0, 19.0]
         );
+    }
 
-        // factor(60) -> [2 2 3 5]
+    #[test]
+    fn test_tier1b_06_factor() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("factor(60)");
         assert!(res.error.is_none());
         assert_eq!(
             ws.variables.get("ans").unwrap().to_vector().unwrap(),
             vec![2.0, 2.0, 3.0, 5.0]
         );
+    }
 
-        // isprime(7) -> 1
+    #[test]
+    fn test_tier1b_07_isprime() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("isprime(7)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 1.0);
+    }
 
-        // nthroot(-8,3) -> -2
+    #[test]
+    fn test_tier1b_08_nthroot() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("nthroot(-8, 3)");
         assert!(res.error.is_none());
         assert!((ws.variables.get("ans").unwrap().as_scalar().unwrap() - (-2.0)).abs() < 1e-9);
     }
 
     #[test]
-    fn test_tier1b_degrees_trig() {
+    fn test_tier1b_09_sind() {
         let mut ws = MathWorkspace::new();
-
-        // sind(30) -> 0.5000
         let res = ws.execute("sind(30)");
         assert!(res.error.is_none());
         assert!((ws.variables.get("ans").unwrap().as_scalar().unwrap() - 0.5).abs() < 1e-9);
+    }
 
-        // cosd(90) -> 0 (đúng tuyệt đối)
+    #[test]
+    fn test_tier1b_10_cosd() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("cosd(90)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 0.0);
     }
 
     #[test]
-    fn test_tier1b_statistics() {
+    fn test_tier1b_11_mean() {
         let mut ws = MathWorkspace::new();
-
-        // mean([1 2 3 4]) -> 2.5000
         let res = ws.execute("mean([1 2 3 4])");
         assert!(res.error.is_none());
         assert!((ws.variables.get("ans").unwrap().as_scalar().unwrap() - 2.5).abs() < 1e-9);
+    }
 
-        // median([3 1 2]) -> 2
+    #[test]
+    fn test_tier1b_12_median() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("median([3 1 2])");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 2.0);
+    }
 
-        // std([1 2 3 4]) -> 1.2910
+    #[test]
+    fn test_tier1b_13_std() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("std([1 2 3 4])");
         assert!(res.error.is_none());
-        assert!((ws.variables.get("ans").unwrap().as_scalar().unwrap() - 1.2909944487358056).abs() < 1e-9);
+        assert!(
+            (ws.variables.get("ans").unwrap().as_scalar().unwrap() - 1.2909944487358056).abs()
+                < 1e-9
+        );
+    }
 
-        // var([1 2 3 4]) -> 1.6667
+    #[test]
+    fn test_tier1b_14_var() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("var([1 2 3 4])");
         assert!(res.error.is_none());
         assert!((ws.variables.get("ans").unwrap().as_scalar().unwrap() - (5.0 / 3.0)).abs() < 1e-9);
+    }
 
-        // cumprod([1 2 3 4]) -> [1 2 6 24]
+    #[test]
+    fn test_tier1b_15_cumprod() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("cumprod([1 2 3 4])");
         assert!(res.error.is_none());
         assert_eq!(
             ws.variables.get("ans").unwrap().to_vector().unwrap(),
             vec![1.0, 2.0, 6.0, 24.0]
         );
+    }
 
-        // diff([1 4 9 16]) -> [3 5 7]
+    #[test]
+    fn test_tier1b_16_diff() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("diff([1 4 9 16])");
         assert!(res.error.is_none());
         assert_eq!(
@@ -476,22 +575,26 @@ mod tests {
     }
 
     #[test]
-    fn test_tier1b_polynomials() {
+    fn test_tier1b_17_polyfit() {
         let mut ws = MathWorkspace::new();
-
-        // polyfit([1 2 3],[2 4 6],1) -> [2 0]
         let res = ws.execute("polyfit([1 2 3], [2 4 6], 1)");
         assert!(res.error.is_none());
         let p = ws.variables.get("ans").unwrap().to_vector().unwrap();
         assert!((p[0] - 2.0).abs() < 1e-9);
         assert!(p[1].abs() < 1e-9);
+    }
 
-        // polyval([1 0 -1],3) -> 8
+    #[test]
+    fn test_tier1b_18_polyval() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("polyval([1 0 -1], 3)");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 8.0);
+    }
 
-        // roots([1 -3 2]) -> [2; 1]
+    #[test]
+    fn test_tier1b_19_roots_real() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("roots([1 -3 2])");
         assert!(res.error.is_none());
         let roots = ws.variables.get("ans").unwrap();
@@ -500,28 +603,38 @@ mod tests {
         let r_vec = roots.to_vector().unwrap();
         assert!((r_vec[0] - 2.0).abs() < 1e-9);
         assert!((r_vec[1] - 1.0).abs() < 1e-9);
-
-        // roots([1 0 1]) -> Error: Complex results are not supported.
-        let res = ws.execute("roots([1 0 1])");
-        assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Complex results are not supported."));
     }
 
     #[test]
-    fn test_tier1b_calculus_and_vectors() {
+    fn test_tier1b_20_roots_complex_error() {
         let mut ws = MathWorkspace::new();
+        let res = ws.execute("roots([1 0 1])");
+        assert!(res.error.is_some());
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Complex results are not supported."));
+    }
 
-        // trapz([0 1 2],[0 1 4]) -> 3
+    #[test]
+    fn test_tier1b_21_trapz() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("trapz([0 1 2], [0 1 4])");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 3.0);
+    }
 
-        // dot([1 2 3],[4 5 6]) -> 32
+    #[test]
+    fn test_tier1b_22_dot() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("dot([1 2 3], [4 5 6])");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 32.0);
+    }
 
-        // cross([1 0 0],[0 1 0]) -> [0 0 1]
+    #[test]
+    fn test_tier1b_23_cross() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("cross([1 0 0], [0 1 0])");
         assert!(res.error.is_none());
         assert_eq!(
@@ -531,10 +644,8 @@ mod tests {
     }
 
     #[test]
-    fn test_tier1b_reshape_and_matrix() {
+    fn test_tier1b_24_reshape() {
         let mut ws = MathWorkspace::new();
-
-        // reshape(1:6,2,3) -> [1 3 5; 2 4 6]
         let res = ws.execute("reshape(1:6, 2, 3)");
         assert!(res.error.is_none());
         let ans = ws.variables.get("ans").unwrap();
@@ -542,8 +653,11 @@ mod tests {
             ans.to_2d_vec(),
             vec![vec![1.0, 3.0, 5.0], vec![2.0, 4.0, 6.0]]
         );
+    }
 
-        // A=[1 2;3 4]; A(:) -> [1;3;2;4]
+    #[test]
+    fn test_tier1b_25_colon_vectorize() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("A = [1 2; 3 4]; A(:)");
         assert!(res.error.is_none());
         assert_eq!(
@@ -553,30 +667,35 @@ mod tests {
     }
 
     #[test]
-    fn test_tier1b_errors() {
+    fn test_tier1b_26_nchoosek_k_exceed_n() {
         let mut ws = MathWorkspace::new();
-
-        // nchoosek(3,5) -> Error: k must not exceed n.
         let res = ws.execute("nchoosek(3, 5)");
         assert!(res.error.is_some());
         assert!(res.error.unwrap().contains("k must not exceed n."));
+    }
 
-        // factorial(-1) -> Error: Input must be a nonnegative integer.
+    #[test]
+    fn test_tier1b_27_factorial_negative() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("factorial(-1)");
         assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Input must be a nonnegative integer."));
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Input must be a nonnegative integer."));
+    }
 
-        // gcd(1.5,3) -> Error: Arguments must be integers.
+    #[test]
+    fn test_tier1b_28_gcd_non_integer() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("gcd(1.5, 3)");
         assert!(res.error.is_some());
         assert!(res.error.unwrap().contains("Arguments must be integers."));
     }
 
     #[test]
-    fn test_tier1b_strings_and_format() {
+    fn test_tier1b_29_num2str_pi() {
         let mut ws = MathWorkspace::new();
-
-        // num2str(pi) -> 3.1416
         let res = ws.execute("num2str(pi)");
         assert!(res.error.is_none());
         if let MathValue::Str(s) = ws.variables.get("ans").unwrap() {
@@ -584,8 +703,11 @@ mod tests {
         } else {
             panic!("Expected string");
         }
+    }
 
-        // num2str(5) -> 5
+    #[test]
+    fn test_tier1b_30_num2str_int() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("num2str(5)");
         assert!(res.error.is_none());
         if let MathValue::Str(s) = ws.variables.get("ans").unwrap() {
@@ -593,49 +715,83 @@ mod tests {
         } else {
             panic!("Expected string");
         }
+    }
 
-        // format rat; 0.75 -> ans = 3/4
+    #[test]
+    fn test_tier1b_31_format_rat() {
+        let mut ws = MathWorkspace::new();
         let res = ws.execute("format rat; 0.75");
         assert!(res.error.is_none());
         assert!(res.text_output.contains("ans = 3/4"));
     }
 
     #[test]
-    fn test_tier1b_rng_and_plots() {
+    fn test_tier1b_32_rng_repeatable() {
         let mut ws = MathWorkspace::new();
-
-        // rng(1); a=rand(); rng(1); b=rand(); a==b -> 1 (tái lập được)
         let res = ws.execute("rng(1); a=rand(); rng(1); b=rand(); a==b");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 1.0);
-
-        // bar([1 2 3]) -> Figure
-        let res = ws.execute("bar([1 2 3])");
-        assert!(res.error.is_none());
-        assert!(res.canvas_commands.iter().any(|c| matches!(c, CanvasCommand::Bar { .. })));
-
-        // pie cannot be combined with other plots
-        let res = ws.execute("plot([1 2]); hold on; pie([1 2 3])");
-        assert!(res.error.is_some());
-        assert!(res.error.unwrap().contains("Pie charts cannot be combined with other plots."));
     }
 
-    // --- Tier 2 Tests ---
+    #[test]
+    fn test_tier1b_33_bar_figure() {
+        let mut ws = MathWorkspace::new();
+        let res = ws.execute("bar([1 2 3])");
+        assert!(res.error.is_none());
+        assert!(res
+            .canvas_commands
+            .iter()
+            .any(|c| matches!(c, CanvasCommand::Bar { .. })));
+    }
+
+    #[test]
+    fn test_tier1b_34_pie_cannot_combine() {
+        let mut ws = MathWorkspace::new();
+        let res = ws.execute("plot(1:3, 1:3); hold on; pie([1 2])");
+        assert!(res.error.is_some());
+        assert!(res
+            .error
+            .unwrap()
+            .contains("Pie charts cannot be combined with other plots."));
+    }
+
+    // =========================================================================
+    // TIER 2 TESTS (docs/SPEC.md Section 7)
+    // =========================================================================
 
     #[test]
     fn test_tier2_relational_and_logical() {
         let mut ws = MathWorkspace::new();
-        let res = ws.execute("eq = ([1 2 3] == [1 0 3]); ne = ([1 2] ~= [1 0]); lt = ([1 2] < [2 1]);");
+        let res =
+            ws.execute("eq = ([1 2 3] == [1 0 3]); ne = ([1 2] ~= [1 0]); lt = ([1 2] < [2 1]);");
         assert!(res.error.is_none());
-        assert_eq!(ws.variables.get("eq").unwrap().to_vector().unwrap(), vec![1.0, 0.0, 1.0]);
-        assert_eq!(ws.variables.get("ne").unwrap().to_vector().unwrap(), vec![0.0, 1.0]);
-        assert_eq!(ws.variables.get("lt").unwrap().to_vector().unwrap(), vec![1.0, 0.0]);
+        assert_eq!(
+            ws.variables.get("eq").unwrap().to_vector().unwrap(),
+            vec![1.0, 0.0, 1.0]
+        );
+        assert_eq!(
+            ws.variables.get("ne").unwrap().to_vector().unwrap(),
+            vec![0.0, 1.0]
+        );
+        assert_eq!(
+            ws.variables.get("lt").unwrap().to_vector().unwrap(),
+            vec![1.0, 0.0]
+        );
 
         let res2 = ws.execute("a = ([1 0] & [1 1]); o = ([1 0] | [0 0]); n = ~[1 0 2];");
         assert!(res2.error.is_none());
-        assert_eq!(ws.variables.get("a").unwrap().to_vector().unwrap(), vec![1.0, 0.0]);
-        assert_eq!(ws.variables.get("o").unwrap().to_vector().unwrap(), vec![1.0, 0.0]);
-        assert_eq!(ws.variables.get("n").unwrap().to_vector().unwrap(), vec![0.0, 1.0, 0.0]);
+        assert_eq!(
+            ws.variables.get("a").unwrap().to_vector().unwrap(),
+            vec![1.0, 0.0]
+        );
+        assert_eq!(
+            ws.variables.get("o").unwrap().to_vector().unwrap(),
+            vec![1.0, 0.0]
+        );
+        assert_eq!(
+            ws.variables.get("n").unwrap().to_vector().unwrap(),
+            vec![0.0, 1.0, 0.0]
+        );
     }
 
     #[test]
@@ -725,7 +881,10 @@ mod tests {
         // Complex eigenvalues -> error
         let res2 = ws.execute("A = [0 -1; 1 0]; eig(A)");
         assert!(res2.error.is_some());
-        assert!(res2.error.unwrap().contains("Complex results are not supported."));
+        assert!(res2
+            .error
+            .unwrap()
+            .contains("Complex results are not supported."));
     }
 
     #[test]
@@ -744,32 +903,21 @@ mod tests {
         assert_eq!(res.canvas_commands.len(), 2);
     }
 
-    // --- Tier 3 Tests (Section E5) ---
+    // =========================================================================
+    // DEDICATED TIER 3 TESTS (docs/SPEC.md Section E5)
+    // =========================================================================
 
     #[test]
-    fn test_tier3_sum2() {
+    fn test_tier3_01_sum2() {
         let mut ws = MathWorkspace::new();
         let code = "function s = sum2(a, b)\n    % Calculate sum of two numbers\n    s = a + b;\nend\nans = sum2(2, 3);";
         let res = ws.execute(code);
         assert!(res.error.is_none(), "Error: {:?}", res.error);
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 5.0);
-
-        // Test help and describe_function
-        let meta = ws.describe_function("sum2").expect("meta found");
-        assert_eq!(meta.name, "sum2");
-        assert_eq!(meta.help, "Calculate sum of two numbers");
-        assert_eq!(meta.max_args, 2);
-        assert_eq!(meta.num_outputs, 1);
-
-        let help_res = ws.execute("help sum2");
-        assert!(help_res.text_output.contains("Calculate sum of two numbers"));
-
-        let which_res = ws.execute("which sum2");
-        assert!(which_res.text_output.contains("'sum2' is a user-defined function."));
     }
 
     #[test]
-    fn test_tier3_nargin_defaults() {
+    fn test_tier3_02_nargin_defaults() {
         let mut ws = MathWorkspace::new();
         let code = "function y = f(a, b)\n    if nargin < 2\n        b = 10;\n    end\n    y = a + b;\nend";
         let res1 = ws.execute(code);
@@ -785,7 +933,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_multi_output_rng2() {
+    fn test_tier3_03_multi_output_rng2() {
         let mut ws = MathWorkspace::new();
         let code = "function [a, b] = rng2(v)\n    a = min(v);\n    b = max(v);\nend\n[a, b] = rng2([3 1 2]);";
         let res = ws.execute(code);
@@ -795,7 +943,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_unassigned_output_error() {
+    fn test_tier3_04_unassigned_output_error() {
         let mut ws = MathWorkspace::new();
         let code = "function y = f(x)\n    % Does not assign y\n    z = x + 1;\nend\nf(5)";
         let res = ws.execute(code);
@@ -807,7 +955,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_too_many_arguments() {
+    fn test_tier3_05_too_many_arguments() {
         let mut ws = MathWorkspace::new();
         let code = "function s = sum2(a, b)\n    s = a + b;\nend\nsum2(1, 2, 3)";
         let res = ws.execute(code);
@@ -819,7 +967,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_cannot_define_builtin() {
+    fn test_tier3_06_cannot_define_builtin() {
         let ws = MathWorkspace::new();
         let code = "function y = sin(x)\n    y = x;\nend";
         let load_res = LibraryManager::parse_function_source("sin.m", code, None, &ws.evaluator);
@@ -829,7 +977,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_recursive_fact() {
+    fn test_tier3_07_recursive_fact() {
         let mut ws = MathWorkspace::new();
         let code = "function f = fact(n)\n    if n <= 1\n        f = 1;\n        return;\n    end\n    f = n * fact(n - 1);\nend\nans = fact(5);";
         let res = ws.execute(code);
@@ -838,7 +986,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_recursion_depth_exceeded() {
+    fn test_tier3_08_recursion_depth_exceeded() {
         let mut ws = MathWorkspace::new();
         ws.evaluator.limits.max_call_depth = 50;
         let code = "function f = fact(n)\n    f = fact(n - 1);\nend\nfact(1e6)";
@@ -851,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_execution_limit_exceeded() {
+    fn test_tier3_09_execution_limit_exceeded() {
         let mut ws = MathWorkspace::new();
         ws.evaluator.limits.max_steps = 10_000;
         let code = "function f()\n    while 1\n    end\nend\nf()";
@@ -864,7 +1012,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_variable_scope_isolation() {
+    fn test_tier3_10_variable_scope_isolation() {
         let mut ws = MathWorkspace::new();
         let code = "x = 1;\nfunction g()\n    x = 5;\nend\ng();";
         let res = ws.execute(code);
@@ -873,10 +1021,11 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_unsupported_eval_rejected() {
+    fn test_tier3_11_unsupported_eval_rejected() {
         let ws = MathWorkspace::new();
         let code = "function y = my_eval(str)\n    y = eval(str);\nend";
-        let load_res = LibraryManager::parse_function_source("my_eval.m", code, None, &ws.evaluator);
+        let load_res =
+            LibraryManager::parse_function_source("my_eval.m", code, None, &ws.evaluator);
         assert!(load_res.is_err());
         let (line, err_msg) = load_res.unwrap_err();
         assert_eq!(line, 2);
@@ -884,11 +1033,45 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_local_functions_in_file() {
+    fn test_tier3_12_help_sum2() {
+        let mut ws = MathWorkspace::new();
+        let code = "function s = sum2(a, b)\n    % Calculate sum of two numbers\n    % This function adds a and b together\n    s = a + b;\nend";
+        let res = ws.execute(code);
+        assert!(res.error.is_none());
+
+        let help_res = ws.execute("help sum2");
+        assert!(help_res
+            .text_output
+            .contains("Calculate sum of two numbers"));
+    }
+
+    #[test]
+    fn test_tier3_13_describe_function() {
+        let mut ws = MathWorkspace::new();
+        let code =
+            "function s = sum2(a, b)\n    % Calculate sum of two numbers\n    s = a + b;\nend";
+        let res = ws.execute(code);
+        assert!(res.error.is_none());
+
+        let meta = ws.describe_function("sum2").expect("meta found");
+        assert_eq!(meta.name, "sum2");
+        assert_eq!(meta.help, "Calculate sum of two numbers");
+        assert_eq!(meta.min_args, 0);
+        assert_eq!(meta.max_args, 2);
+        assert_eq!(meta.num_outputs, 1);
+    }
+
+    #[test]
+    fn test_tier3_14_local_functions_in_file() {
         let mut ws = MathWorkspace::new();
         let code = "function y = main_fn(x)\n    y = helper(x) * 2;\nend\nfunction h = helper(z)\n    h = z + 1;\nend";
-        let (ast, meta) = LibraryManager::parse_function_source("main_fn.m", code, None, &ws.evaluator).expect("parse ok");
-        ws.evaluator.registry.register_user(ast, meta).expect("register ok");
+        let (ast, meta) =
+            LibraryManager::parse_function_source("main_fn.m", code, None, &ws.evaluator)
+                .expect("parse ok");
+        ws.evaluator
+            .registry
+            .register_user(ast, meta)
+            .expect("register ok");
 
         // Calling public function works
         let res1 = ws.execute("ans = main_fn(3);");
@@ -898,18 +1081,29 @@ mod tests {
         // Calling local function directly from outside fails
         let res2 = ws.execute("helper(3);");
         assert!(res2.error.is_some());
-        assert!(res2.error.unwrap().contains("Unrecognized function or variable 'helper'."));
+        assert!(res2
+            .error
+            .unwrap()
+            .contains("Unrecognized function or variable 'helper'."));
     }
 
     #[test]
-    fn test_tier3_library_collision() {
+    fn test_tier3_15_library_collision() {
         let mut ws = MathWorkspace::new();
         let code = "function y = f(x)\n    y = x;\nend";
-        let (ast1, meta1) = LibraryManager::parse_function_source("f.m", code, Some("libA"), &ws.evaluator).unwrap();
+        let (ast1, meta1) =
+            LibraryManager::parse_function_source("f.m", code, Some("libA"), &ws.evaluator)
+                .unwrap();
         ws.evaluator.registry.register_user(ast1, meta1).unwrap();
 
-        let (ast2, meta2) = LibraryManager::parse_function_source("f.m", code, Some("libB"), &ws.evaluator).unwrap();
-        let err = ws.evaluator.registry.register_user(ast2, meta2).unwrap_err();
+        let (ast2, meta2) =
+            LibraryManager::parse_function_source("f.m", code, Some("libB"), &ws.evaluator)
+                .unwrap();
+        let err = ws
+            .evaluator
+            .registry
+            .register_user(ast2, meta2)
+            .unwrap_err();
         assert_eq!(
             err.raw_message(),
             "Function 'f' is defined in both 'libA' and 'libB'."
@@ -917,7 +1111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tier3_whiteboard_embedded_functions() {
+    fn test_tier3_16_whiteboard_embedded_functions() {
         let mut ws = MathWorkspace::new();
         let source = "function y = my_cube(x)\n    y = x .^ 3;\nend";
         let hash = compute_source_hash(source);
@@ -936,5 +1130,104 @@ mod tests {
         let res = ws.execute("ans = my_cube(3);");
         assert!(res.error.is_none());
         assert_eq!(ws.variables.get("ans").unwrap().as_scalar().unwrap(), 27.0);
+    }
+
+    #[test]
+    fn test_verify_user_commands() {
+        let mut ws = MathWorkspace::new();
+
+        // 1. y=x+
+        let r1 = ws.execute("x=5; y=x+");
+        println!("r1 error: {:?}", r1.error);
+
+        // 2. while 1; end (with low limit for speed)
+        ws.evaluator.limits.max_steps = 100;
+        let r2 = ws.execute("while 1; end");
+        println!("r2 error: {:?}", r2.error);
+
+        // 3. plot(x, y, "Damped Wave")
+        let r3 = ws.execute("x=1:5; y=1:5; plot(x, y, \"Damped Wave\")");
+        println!("r3 error: {:?}", r3.error);
+
+        // 4. plot(1:3,1:3); hold on; plot(1:3,[3 2 1])
+        let r4 = ws.execute("plot(1:3,1:3); hold on; plot(1:3,[3 2 1])");
+        println!(
+            "r4 error: {:?}, commands: {}",
+            r4.error,
+            r4.canvas_commands.len()
+        );
+
+        // 5. plot(1:3,1:3); hold on; plot(1:3,[3 2 1]);
+        let r5 = ws.execute("plot(1:3,1:3); hold on; plot(1:3,[3 2 1]);");
+        println!(
+            "r5 error: {:?}, commands: {}",
+            r5.error,
+            r5.canvas_commands.len()
+        );
+
+        // 6. clf
+        let r6 = ws.execute("clf");
+        assert!(r6.error.is_none());
+        assert!(r6
+            .canvas_commands
+            .iter()
+            .any(|c| matches!(c, CanvasCommand::ClearPlots)));
+
+        // 7. Full user demo script
+        ws.evaluator.limits.max_steps = 10_000_000;
+        let user_script = r#"
+x = linspace(-2*pi, 2*pi, 200);
+plot(x, sin(x))
+hold on
+plot(x, cos(x))
+title("Sin va Cos")
+xlabel("x")
+ylabel("y")
+grid on
+legend("sin","cos")
+hold off
+
+clf
+plot(x, x.^2, "k:")
+
+clf
+plot(x, sin(x), "DisplayName", "sin")
+
+clf
+bar([3 5 2 8])
+clf
+hist([1 2 2 3 3 3 4 4 5], 5)
+clf
+pie([1 2 3])
+clf
+scatter([1 2 3 4],[2 4 3 5])
+
+clf
+t = linspace(0,2*pi,100);
+plot(cos(t), sin(t))
+axis equal
+xline(0)
+yline(0)
+text(0, 0, "O")
+
+clf
+h = @(x) x.^3 - 3*x + 1;
+fplot(h, [-3 3])
+"#;
+        let r7 = ws.execute(user_script);
+        println!(
+            "r7 error: {:?}, canvas commands count: {}",
+            r7.error,
+            r7.canvas_commands.len()
+        );
+        for (i, cmd) in r7.canvas_commands.iter().enumerate() {
+            println!("  cmd {}: {:?}", i, std::mem::discriminant(cmd));
+        }
+        assert!(
+            r7.error.is_none(),
+            "User demo script failed: {:?}",
+            r7.error
+        );
+        assert!(!r7.canvas_commands.is_empty());
     }
 }

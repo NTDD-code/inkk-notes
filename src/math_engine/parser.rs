@@ -70,7 +70,10 @@ impl Parser {
 
     pub fn parse_next_stmt(&mut self) -> Result<Option<Stmt>, MathError> {
         while !self.check(&TokenKind::Eof) {
-            if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+            if self.match_token(&TokenKind::Newline)
+                || self.match_token(&TokenKind::Semicolon)
+                || self.match_token(&TokenKind::Comma)
+            {
                 continue;
             }
             if self.check(&TokenKind::Eof) {
@@ -147,7 +150,10 @@ impl Parser {
 
         while !self.check(&TokenKind::Eof) {
             // Skip leading whitespace / newlines / semicolons between statements
-            if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+            if self.match_token(&TokenKind::Newline)
+                || self.match_token(&TokenKind::Semicolon)
+                || self.match_token(&TokenKind::Comma)
+            {
                 continue;
             }
 
@@ -174,17 +180,26 @@ impl Parser {
             TokenKind::Return => {
                 self.advance();
                 self.parse_stmt_terminator();
-                return Ok(Stmt { line, kind: StmtKind::Return });
+                return Ok(Stmt {
+                    line,
+                    kind: StmtKind::Return,
+                });
             }
             TokenKind::Break => {
                 self.advance();
                 self.parse_stmt_terminator();
-                return Ok(Stmt { line, kind: StmtKind::Break });
+                return Ok(Stmt {
+                    line,
+                    kind: StmtKind::Break,
+                });
             }
             TokenKind::Continue => {
                 self.advance();
                 self.parse_stmt_terminator();
-                return Ok(Stmt { line, kind: StmtKind::Continue });
+                return Ok(Stmt {
+                    line,
+                    kind: StmtKind::Continue,
+                });
             }
             _ => {}
         }
@@ -194,7 +209,10 @@ impl Parser {
             let cmd_name = name.clone();
             if is_command_name(&cmd_name) {
                 if let Some(cmd) = self.try_parse_command(&cmd_name)? {
-                    return Ok(Stmt { line, kind: StmtKind::Command(cmd) });
+                    return Ok(Stmt {
+                        line,
+                        kind: StmtKind::Command(cmd),
+                    });
                 }
             }
         }
@@ -283,6 +301,10 @@ impl Parser {
             "clc" => {
                 self.parse_stmt_terminator();
                 CommandStmt::Clc
+            }
+            "clf" => {
+                self.parse_stmt_terminator();
+                CommandStmt::Clf
             }
             "close" => {
                 let mut target = None;
@@ -432,7 +454,10 @@ impl Parser {
             }
             break;
         }
-        if !targets.is_empty() && self.match_token(&TokenKind::RBracket) && self.match_token(&TokenKind::Equal) {
+        if !targets.is_empty()
+            && self.match_token(&TokenKind::RBracket)
+            && self.match_token(&TokenKind::Equal)
+        {
             let expr = self.parse_expr()?;
             let print = self.parse_stmt_terminator();
             return Ok(Some(Stmt {
@@ -465,7 +490,10 @@ impl Parser {
 
         let mut body = Vec::new();
         while !self.check(&TokenKind::End) && !self.check(&TokenKind::Eof) {
-            if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+            if self.match_token(&TokenKind::Newline)
+                || self.match_token(&TokenKind::Semicolon)
+                || self.match_token(&TokenKind::Comma)
+            {
                 continue;
             }
             if self.check(&TokenKind::End) {
@@ -494,7 +522,10 @@ impl Parser {
 
         let mut body = Vec::new();
         while !self.check(&TokenKind::End) && !self.check(&TokenKind::Eof) {
-            if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+            if self.match_token(&TokenKind::Newline)
+                || self.match_token(&TokenKind::Semicolon)
+                || self.match_token(&TokenKind::Comma)
+            {
                 continue;
             }
             if self.check(&TokenKind::End) {
@@ -520,11 +551,20 @@ impl Parser {
         let mut branches = Vec::new();
         let mut cur_body = Vec::new();
 
-        while !matches!(self.peek_kind(), TokenKind::ElseIf | TokenKind::Else | TokenKind::End | TokenKind::Eof) {
-            if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+        while !matches!(
+            self.peek_kind(),
+            TokenKind::ElseIf | TokenKind::Else | TokenKind::End | TokenKind::Eof
+        ) {
+            if self.match_token(&TokenKind::Newline)
+                || self.match_token(&TokenKind::Semicolon)
+                || self.match_token(&TokenKind::Comma)
+            {
                 continue;
             }
-            if matches!(self.peek_kind(), TokenKind::ElseIf | TokenKind::Else | TokenKind::End) {
+            if matches!(
+                self.peek_kind(),
+                TokenKind::ElseIf | TokenKind::Else | TokenKind::End
+            ) {
                 break;
             }
             cur_body.push(self.parse_stmt()?);
@@ -535,11 +575,20 @@ impl Parser {
             let elif_cond = self.parse_expr()?;
             self.parse_stmt_terminator();
             let mut elif_body = Vec::new();
-            while !matches!(self.peek_kind(), TokenKind::ElseIf | TokenKind::Else | TokenKind::End | TokenKind::Eof) {
-                if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+            while !matches!(
+                self.peek_kind(),
+                TokenKind::ElseIf | TokenKind::Else | TokenKind::End | TokenKind::Eof
+            ) {
+                if self.match_token(&TokenKind::Newline)
+                    || self.match_token(&TokenKind::Semicolon)
+                    || self.match_token(&TokenKind::Comma)
+                {
                     continue;
                 }
-                if matches!(self.peek_kind(), TokenKind::ElseIf | TokenKind::Else | TokenKind::End) {
+                if matches!(
+                    self.peek_kind(),
+                    TokenKind::ElseIf | TokenKind::Else | TokenKind::End
+                ) {
                     break;
                 }
                 elif_body.push(self.parse_stmt()?);
@@ -552,7 +601,10 @@ impl Parser {
             self.parse_stmt_terminator();
             let mut el_body = Vec::new();
             while !self.check(&TokenKind::End) && !self.check(&TokenKind::Eof) {
-                if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+                if self.match_token(&TokenKind::Newline)
+                    || self.match_token(&TokenKind::Semicolon)
+                    || self.match_token(&TokenKind::Comma)
+                {
                     continue;
                 }
                 if self.check(&TokenKind::End) {
@@ -607,7 +659,9 @@ impl Parser {
                 return self.error("Expected function name after '='");
             }
         } else if let TokenKind::Ident(first_id) = self.peek_kind().clone() {
-            if self.pos + 1 < self.tokens.len() && self.tokens[self.pos + 1].kind == TokenKind::Equal {
+            if self.pos + 1 < self.tokens.len()
+                && self.tokens[self.pos + 1].kind == TokenKind::Equal
+            {
                 self.advance(); // consume first_id
                 returns.push(first_id);
                 self.advance(); // consume '='
@@ -655,7 +709,10 @@ impl Parser {
         let mut local_functions = std::collections::HashMap::new();
 
         while !self.check(&TokenKind::End) && !self.check(&TokenKind::Eof) {
-            if self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {
+            if self.match_token(&TokenKind::Newline)
+                || self.match_token(&TokenKind::Semicolon)
+                || self.match_token(&TokenKind::Comma)
+            {
                 continue;
             }
             if self.check(&TokenKind::End) {
@@ -702,7 +759,10 @@ impl Parser {
 
     fn parse_stmt_terminator(&mut self) -> bool {
         let mut print = true;
-        while self.check(&TokenKind::Semicolon) || self.check(&TokenKind::Comma) || self.check(&TokenKind::Newline) {
+        while self.check(&TokenKind::Semicolon)
+            || self.check(&TokenKind::Comma)
+            || self.check(&TokenKind::Newline)
+        {
             if self.match_token(&TokenKind::Semicolon) {
                 print = false;
             } else {
@@ -971,7 +1031,8 @@ impl Parser {
         let line = self.current_line();
         let mut expr = self.parse_primary()?;
 
-        while self.match_token(&TokenKind::Transpose) || self.match_token(&TokenKind::DotTranspose) {
+        while self.match_token(&TokenKind::Transpose) || self.match_token(&TokenKind::DotTranspose)
+        {
             expr = Expr {
                 line,
                 kind: ExprKind::Unary {
@@ -1106,7 +1167,10 @@ impl Parser {
         let mut cur_row: Vec<Expr> = Vec::new();
 
         // Skip leading whitespace / newlines / delimiters
-        while self.match_token(&TokenKind::Newline) || self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Comma) {}
+        while self.match_token(&TokenKind::Newline)
+            || self.match_token(&TokenKind::Semicolon)
+            || self.match_token(&TokenKind::Comma)
+        {}
 
         if self.match_token(&TokenKind::RBracket) {
             return Ok(Expr {
@@ -1132,7 +1196,9 @@ impl Parser {
             if self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Newline) {
                 rows.push(std::mem::take(&mut cur_row));
                 // Skip subsequent semicolons and newlines
-                while self.match_token(&TokenKind::Semicolon) || self.match_token(&TokenKind::Newline) {}
+                while self.match_token(&TokenKind::Semicolon)
+                    || self.match_token(&TokenKind::Newline)
+                {}
             }
 
             if self.match_token(&TokenKind::RBracket) {
