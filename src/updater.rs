@@ -220,7 +220,7 @@ impl UpdaterState {
                     UpdateStatus::UpdateAvailable(ref manifest) => {
                         // Title header
                         ui.label(
-                            egui::RichText::new("✦ A New Version of Inkk is Available!")
+                            egui::RichText::new("A New Version of Inkk is Available!")
                                 .font(crate::theme::font_serif(18.0))
                                 .strong()
                                 .color(brick_accent),
@@ -233,7 +233,7 @@ impl UpdaterState {
                                     .size(12.0)
                                     .color(text_muted),
                             );
-                            ui.label(egui::RichText::new("➔").size(12.0).color(brick_accent));
+                            ui.label(egui::RichText::new("->").size(12.0).color(brick_accent));
                             ui.label(
                                 egui::RichText::new(format!("New: v{}", manifest.version))
                                     .size(12.5)
@@ -290,7 +290,7 @@ impl UpdaterState {
                         // Action Buttons
                         ui.horizontal(|ui| {
                             let download_btn = egui::Button::new(
-                                egui::RichText::new("⬇ Download & Install Update")
+                                egui::RichText::new("Download & Install Update")
                                     .size(12.5)
                                     .strong()
                                     .color(Color32::WHITE),
@@ -318,7 +318,7 @@ impl UpdaterState {
                     }
                     UpdateStatus::UpToDate(ref v) => {
                         ui.label(
-                            egui::RichText::new("✔ You're Up to Date!")
+                            egui::RichText::new("You're Up to Date!")
                                 .font(crate::theme::font_serif(17.0))
                                 .strong()
                                 .color(Color32::from_rgb(0x4E, 0xC9, 0xB0)),
@@ -349,7 +349,7 @@ impl UpdaterState {
                     }
                     UpdateStatus::Error(ref err) => {
                         ui.label(
-                            egui::RichText::new("⚠ Check Failed")
+                            egui::RichText::new("Check Failed")
                                 .font(crate::theme::font_serif(16.0))
                                 .strong()
                                 .color(brick_accent),

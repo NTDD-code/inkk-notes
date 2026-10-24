@@ -77,6 +77,37 @@ pub const SHAPE_SPHERE_3D_PATH: &str =
 pub const SKETCHPAD_PATH: &str =
     "M12 3.5L6.5 20.5 M12 3.5L17.5 20.5 M8.5 14.5H15.5 M12 2V5 M9 18C10.5 19 13.5 19 15 18";
 
+// Page and document action vector paths (24x24 viewBox)
+pub const MOVE_UP_PATH: &str = "M6 14L12 8L18 14";
+pub const MOVE_DOWN_PATH: &str = "M6 10L12 16L18 10";
+pub const DUPLICATE_PATH: &str =
+    "M8 4.5H16C17.1 4.5 18 5.4 18 6.5V14.5 M6 8.5H14C15.1 8.5 16 9.4 16 10.5V18.5C16 19.6 15.1 20.5 14 20.5H6C4.9 20.5 4 19.6 4 18.5V10.5C4 9.4 4.9 8.5 6 8.5Z";
+pub const DELETE_PATH: &str =
+    "M4.5 6.5H19.5 M9.5 6.5V4.5H14.5V6.5 M6.5 6.5L7.5 19.5C7.5 20.1 8 20.5 8.5 20.5H15.5C16 20.5 16.5 20.1 16.5 19.5L17.5 6.5 M10 10.5V16.5 M14 10.5V16.5";
+pub const ADD_PATH: &str = "M12 5V19 M5 12H19";
+pub const CLOSE_PATH: &str = "M6 6L18 18 M18 6L6 18";
+
+// Tools, History, Canvas, and Stencil vector paths (24x24 viewBox)
+pub const UNDO_PATH: &str = "M9 14L4 9L9 4 M4 9H15C17.8 9 20 11.2 20 14C20 16.8 17.8 19 15 19H8";
+pub const REDO_PATH: &str = "M15 14L20 9L15 4 M20 9H9C6.2 9 4 11.2 4 14C4 16.8 6.2 19 9 19H16";
+pub const PEN_PATH: &str = "M18 2.5L21.5 6L7.5 20H4V16.5L18 2.5Z M15 5.5L18.5 9";
+pub const HIGHLIGHTER_PATH: &str = "M15 3.5L20.5 9L14 15.5L8.5 10L15 3.5Z M6.5 12L3.5 19L10.5 16Z";
+pub const ERASER_STROKE_PATH: &str = "M18 4L20 6L9 17L5 17L5 13L16 2Z M3 21H21";
+pub const ERASER_POINT_PATH: &str = "M6 6L18 18 M18 6L6 18 M12 3V5 M12 19V21 M3 12H5 M19 12H21";
+pub const LASSO_PATH: &str = "M7 4C4 6 3 11 5 15C7 19 13 21 17 19C21 17 21 12 19 8C17 4 11 2 7 4Z M14 9L18 9 M16 7L16 11";
+pub const PAN_PATH: &str = "M7 11V6C7 5 8 4 9 4C10 4 11 5 11 6V10 M11 6C11 5 12 4 13 4C14 4 15 5 15 6V10 M15 7C15 6 16 5 17 5C18 5 19 6 19 7V12C19 16.5 15.5 20 11 20C7 20 5 17 5 14V10C5 9 6 8 7 8V11";
+pub const RULER_PATH: &str = "M3 8H21V14H3Z M7 8V11 M11 8V12 M15 8V11 M19 8V12";
+pub const PROTRACTOR_PATH: &str = "M3 17H21C21 12 17 8 12 8C7 8 3 12 3 17Z M12 14V17 M12 8V11";
+pub const PICTURE_PATH: &str = "M4 5H20V19H4Z M8.5 10C9.3 10 10 9.3 10 8.5C10 7.7 9.3 7 8.5 7C7.7 7 7 7.7 7 8.5C7 9.3 7.7 10 8.5 10Z M4 17L9 12L13 16L16 13L20 17";
+pub const SUN_PATH: &str = "M12 7C9.2 7 7 9.2 7 12C7 14.8 9.2 17 12 17C14.8 17 17 14.8 17 12C17 9.2 14.8 7 12 7Z M12 2V4 M12 20V22 M2 12H4 M20 12H22 M4.9 4.9L6.3 6.3 M17.7 17.7L19.1 19.1 M4.9 19.1L6.3 17.7 M17.7 6.3L19.1 4.9";
+pub const MOON_PATH: &str = "M12 3C7 3 3 7 3 12C3 17 7 21 12 21C16 21 19.3 18.5 20.6 15C19.7 15.3 18.9 15.5 18 15.5C13.9 15.5 10.5 12.1 10.5 8C10.5 6 11.3 4.2 12.5 3C12.3 3 12.2 3 12 3Z";
+pub const PREV_PATH: &str = "M15 18L9 12L15 6";
+pub const NEXT_PATH: &str = "M9 18L15 12L9 6";
+pub const EXTEND_PATH: &str = "M12 4V16 M7 11L12 16L17 11 M5 20H19";
+pub const FIT_PATH: &str = "M4 9V4H9 M15 4H20V9 M20 15V20H15 M9 20H4V15";
+pub const CHECK_PATH: &str = "M4 12L9 17L20 6";
+pub const WARN_PATH: &str = "M12 9V13 M12 17H12.01 M10.3 3.9L1.8 18C1.4 18.7 1.9 19.5 2.7 19.5H21.3C22.1 19.5 22.6 18.7 22.2 18L13.7 3.9C13.3 3.2 12.3 3.2 12 3.9Z";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum VectorIcon {
     Library,
@@ -91,6 +122,31 @@ pub enum VectorIcon {
     Pdf,
     Autosave,
     Sketchpad,
+    MoveUp,
+    MoveDown,
+    Duplicate,
+    Delete,
+    Add,
+    Close,
+    Undo,
+    Redo,
+    Pen,
+    Highlighter,
+    EraserStroke,
+    EraserPoint,
+    Lasso,
+    Pan,
+    Ruler,
+    Protractor,
+    Picture,
+    Sun,
+    Moon,
+    Prev,
+    Next,
+    Extend,
+    Fit,
+    Check,
+    Warn,
     // Shapes & Graphs
     ShapeLine,
     ShapeArrow,
@@ -110,7 +166,7 @@ pub enum VectorIcon {
 }
 
 impl VectorIcon {
-    pub const ALL: [VectorIcon; 27] = [
+    pub const ALL: [VectorIcon; 52] = [
         VectorIcon::Library,
         VectorIcon::Save,
         VectorIcon::Pages,
@@ -123,6 +179,31 @@ impl VectorIcon {
         VectorIcon::Pdf,
         VectorIcon::Autosave,
         VectorIcon::Sketchpad,
+        VectorIcon::MoveUp,
+        VectorIcon::MoveDown,
+        VectorIcon::Duplicate,
+        VectorIcon::Delete,
+        VectorIcon::Add,
+        VectorIcon::Close,
+        VectorIcon::Undo,
+        VectorIcon::Redo,
+        VectorIcon::Pen,
+        VectorIcon::Highlighter,
+        VectorIcon::EraserStroke,
+        VectorIcon::EraserPoint,
+        VectorIcon::Lasso,
+        VectorIcon::Pan,
+        VectorIcon::Ruler,
+        VectorIcon::Protractor,
+        VectorIcon::Picture,
+        VectorIcon::Sun,
+        VectorIcon::Moon,
+        VectorIcon::Prev,
+        VectorIcon::Next,
+        VectorIcon::Extend,
+        VectorIcon::Fit,
+        VectorIcon::Check,
+        VectorIcon::Warn,
         VectorIcon::ShapeLine,
         VectorIcon::ShapeArrow,
         VectorIcon::ShapeDoubleArrow,
@@ -154,6 +235,31 @@ impl VectorIcon {
             VectorIcon::Pdf => PDF_PATH,
             VectorIcon::Autosave => AUTOSAVE_PATH,
             VectorIcon::Sketchpad => SKETCHPAD_PATH,
+            VectorIcon::MoveUp => MOVE_UP_PATH,
+            VectorIcon::MoveDown => MOVE_DOWN_PATH,
+            VectorIcon::Duplicate => DUPLICATE_PATH,
+            VectorIcon::Delete => DELETE_PATH,
+            VectorIcon::Add => ADD_PATH,
+            VectorIcon::Close => CLOSE_PATH,
+            VectorIcon::Undo => UNDO_PATH,
+            VectorIcon::Redo => REDO_PATH,
+            VectorIcon::Pen => PEN_PATH,
+            VectorIcon::Highlighter => HIGHLIGHTER_PATH,
+            VectorIcon::EraserStroke => ERASER_STROKE_PATH,
+            VectorIcon::EraserPoint => ERASER_POINT_PATH,
+            VectorIcon::Lasso => LASSO_PATH,
+            VectorIcon::Pan => PAN_PATH,
+            VectorIcon::Ruler => RULER_PATH,
+            VectorIcon::Protractor => PROTRACTOR_PATH,
+            VectorIcon::Picture => PICTURE_PATH,
+            VectorIcon::Sun => SUN_PATH,
+            VectorIcon::Moon => MOON_PATH,
+            VectorIcon::Prev => PREV_PATH,
+            VectorIcon::Next => NEXT_PATH,
+            VectorIcon::Extend => EXTEND_PATH,
+            VectorIcon::Fit => FIT_PATH,
+            VectorIcon::Check => CHECK_PATH,
+            VectorIcon::Warn => WARN_PATH,
             VectorIcon::ShapeLine => SHAPE_LINE_PATH,
             VectorIcon::ShapeArrow => SHAPE_ARROW_PATH,
             VectorIcon::ShapeDoubleArrow => SHAPE_DOUBLE_ARROW_PATH,
@@ -186,6 +292,31 @@ impl VectorIcon {
             VectorIcon::Pdf => "PDF",
             VectorIcon::Autosave => "Autosave",
             VectorIcon::Sketchpad => "Sketchpad",
+            VectorIcon::MoveUp => "Move Up",
+            VectorIcon::MoveDown => "Move Down",
+            VectorIcon::Duplicate => "Duplicate",
+            VectorIcon::Delete => "Delete",
+            VectorIcon::Add => "Add",
+            VectorIcon::Close => "Close",
+            VectorIcon::Undo => "Undo",
+            VectorIcon::Redo => "Redo",
+            VectorIcon::Pen => "Pen",
+            VectorIcon::Highlighter => "Highlighter",
+            VectorIcon::EraserStroke => "Stroke Eraser",
+            VectorIcon::EraserPoint => "Point Eraser",
+            VectorIcon::Lasso => "Lasso",
+            VectorIcon::Pan => "Pan",
+            VectorIcon::Ruler => "Ruler",
+            VectorIcon::Protractor => "Protractor",
+            VectorIcon::Picture => "Picture",
+            VectorIcon::Sun => "Light Mode",
+            VectorIcon::Moon => "Dark Mode",
+            VectorIcon::Prev => "Previous",
+            VectorIcon::Next => "Next",
+            VectorIcon::Extend => "Extend",
+            VectorIcon::Fit => "Fit",
+            VectorIcon::Check => "Check",
+            VectorIcon::Warn => "Warning",
             VectorIcon::ShapeLine => "Line",
             VectorIcon::ShapeArrow => "Arrow",
             VectorIcon::ShapeDoubleArrow => "Double Arrow",
@@ -218,6 +349,31 @@ impl VectorIcon {
             VectorIcon::Pdf => "Export Notebook to PDF (Ctrl+Shift+E)",
             VectorIcon::Autosave => "Autosave & Crash Recovery Settings",
             VectorIcon::Sketchpad => "Geometry Sketchpad (GSP) & 3D Spatial Studio (Ctrl+G)",
+            VectorIcon::MoveUp => "Move page earlier in document",
+            VectorIcon::MoveDown => "Move page later in document",
+            VectorIcon::Duplicate => "Duplicate page",
+            VectorIcon::Delete => "Delete page",
+            VectorIcon::Add => "Add page",
+            VectorIcon::Close => "Close",
+            VectorIcon::Undo => "Undo (Ctrl+Z)",
+            VectorIcon::Redo => "Redo (Ctrl+Y)",
+            VectorIcon::Pen => "Pen (1)",
+            VectorIcon::Highlighter => "Highlighter (2)",
+            VectorIcon::EraserStroke => "Stroke Eraser (5)",
+            VectorIcon::EraserPoint => "Point Eraser (6)",
+            VectorIcon::Lasso => "Lasso Select (7 / L)",
+            VectorIcon::Pan => "Pan Canvas (8 / Space)",
+            VectorIcon::Ruler => "Straight Ruler (R)",
+            VectorIcon::Protractor => "Circular Protractor (Shift+R)",
+            VectorIcon::Picture => "Insert Image from file (or Ctrl+V to paste)",
+            VectorIcon::Sun => "Switch to light theme",
+            VectorIcon::Moon => "Switch to dark theme",
+            VectorIcon::Prev => "Previous page (PgUp)",
+            VectorIcon::Next => "Next page (PgDn)",
+            VectorIcon::Extend => "Extend page by 600 px",
+            VectorIcon::Fit => "Fit page to window",
+            VectorIcon::Check => "Success / Confirmed",
+            VectorIcon::Warn => "Warning / Alert",
             VectorIcon::ShapeLine => "Draw straight line",
             VectorIcon::ShapeArrow => "Draw arrow",
             VectorIcon::ShapeDoubleArrow => "Draw double-ended arrow",
@@ -285,6 +441,106 @@ impl VectorIcon {
             VectorIcon::Sketchpad => {
                 static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
                 CACHE.get_or_init(|| ParsedSvg::parse(SKETCHPAD_PATH))
+            }
+            VectorIcon::MoveUp => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(MOVE_UP_PATH))
+            }
+            VectorIcon::MoveDown => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(MOVE_DOWN_PATH))
+            }
+            VectorIcon::Duplicate => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(DUPLICATE_PATH))
+            }
+            VectorIcon::Delete => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(DELETE_PATH))
+            }
+            VectorIcon::Add => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(ADD_PATH))
+            }
+            VectorIcon::Close => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(CLOSE_PATH))
+            }
+            VectorIcon::Undo => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(UNDO_PATH))
+            }
+            VectorIcon::Redo => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(REDO_PATH))
+            }
+            VectorIcon::Pen => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(PEN_PATH))
+            }
+            VectorIcon::Highlighter => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(HIGHLIGHTER_PATH))
+            }
+            VectorIcon::EraserStroke => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(ERASER_STROKE_PATH))
+            }
+            VectorIcon::EraserPoint => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(ERASER_POINT_PATH))
+            }
+            VectorIcon::Lasso => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(LASSO_PATH))
+            }
+            VectorIcon::Pan => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(PAN_PATH))
+            }
+            VectorIcon::Ruler => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(RULER_PATH))
+            }
+            VectorIcon::Protractor => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(PROTRACTOR_PATH))
+            }
+            VectorIcon::Picture => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(PICTURE_PATH))
+            }
+            VectorIcon::Sun => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SUN_PATH))
+            }
+            VectorIcon::Moon => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(MOON_PATH))
+            }
+            VectorIcon::Prev => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(PREV_PATH))
+            }
+            VectorIcon::Next => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(NEXT_PATH))
+            }
+            VectorIcon::Extend => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(EXTEND_PATH))
+            }
+            VectorIcon::Fit => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(FIT_PATH))
+            }
+            VectorIcon::Check => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(CHECK_PATH))
+            }
+            VectorIcon::Warn => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(WARN_PATH))
             }
             VectorIcon::ShapeLine => {
                 static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
@@ -675,7 +931,7 @@ mod tests {
 
     #[test]
     fn test_all_ten_icons_parse() {
-        assert_eq!(VectorIcon::ALL.len(), 27);
+        assert_eq!(VectorIcon::ALL.len(), 52);
         for icon in VectorIcon::ALL {
             let parsed = icon.parsed();
             let total_geometry = parsed.rects.len() + parsed.subpaths.len();

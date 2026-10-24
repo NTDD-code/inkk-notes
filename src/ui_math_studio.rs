@@ -108,7 +108,7 @@ impl MathStudioState {
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Close button
-                        if widgets::tool_button(ui, palette, theme::icon::CLOSE, false, "Close").clicked() {
+                        if widgets::tool_button(ui, palette, VectorIcon::Close, false, "Close").clicked() {
                             self.is_open = false;
                         }
 
@@ -173,7 +173,7 @@ impl MathStudioState {
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let run_btn = egui::Button::new(
-                            egui::RichText::new("▶ Run")
+                            egui::RichText::new("Run")
                                 .strong()
                                 .color(palette.on_accent),
                         )
@@ -426,7 +426,7 @@ impl MathStudioState {
                     .color(palette.text),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let reload_btn = egui::Button::new(egui::RichText::new("🔄 Reload").size(12.0))
+                let reload_btn = egui::Button::new(egui::RichText::new("Reload").size(12.0))
                     .fill(palette.accent_soft)
                     .stroke(egui::Stroke::new(1.0_f32, palette.accent))
                     .rounding(theme::RADIUS_SMALL)

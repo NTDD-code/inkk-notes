@@ -351,7 +351,7 @@ impl OnboardingTourState {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .button(
-                                egui::RichText::new("✕ Skip")
+                                egui::RichText::new("Skip")
                                     .size(11.0)
                                     .color(text_muted),
                             )
@@ -385,7 +385,7 @@ impl OnboardingTourState {
 
                 // Tip note
                 card_ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("💡").size(12.0));
+                    ui.label(egui::RichText::new("TIP:").size(11.0).strong().color(brick_accent));
                     ui.label(
                         egui::RichText::new(current_step_info.tip)
                             .size(11.0)
@@ -409,7 +409,7 @@ impl OnboardingTourState {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             // Next / Finish button
                             let is_last = self.current_step + 1 >= steps.len();
-                            let next_label = if is_last { "Start Writing ➔" } else { "Next ➔" };
+                            let next_label = if is_last { "Start Writing" } else { "Next" };
                             let next_btn = egui::Button::new(
                                 egui::RichText::new(next_label)
                                     .size(12.0)
@@ -428,7 +428,7 @@ impl OnboardingTourState {
                             // Back button
                             if self.current_step > 0 {
                                 let back_btn = egui::Button::new(
-                                    egui::RichText::new("⮜ Back")
+                                    egui::RichText::new("Back")
                                         .size(12.0)
                                         .color(text_muted),
                                 )

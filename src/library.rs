@@ -285,7 +285,7 @@ impl LibraryState {
         let mut action: Option<LibraryAction> = None;
         let mut is_open = self.is_open;
 
-        egui::Window::new("📚 Inkk Notebook Library")
+        egui::Window::new("Inkk Notebook Library")
             .open(&mut is_open)
             .resizable(true)
             .collapsible(false)
@@ -311,21 +311,21 @@ impl LibraryState {
                     }
 
                     // Import Note Button
-                    if ui.button("📁 Import Note...").on_hover_text("Open external .handnote or .inkk file").clicked() {
+                    if ui.button("Import Note...").on_hover_text("Open external .handnote or .inkk file").clicked() {
                         action = Some(LibraryAction::ImportFile);
                     }
 
                     // Open Folder in Explorer
-                    if ui.button("📂 Open Folder").on_hover_text("Open notebooks folder in Windows Explorer").clicked() {
+                    if ui.button("Open Folder").on_hover_text("Open notebooks folder in Windows Explorer").clicked() {
                         action = Some(LibraryAction::OpenFolderInExplorer);
                     }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // View Toggle: Grid vs List
-                        if ui.selectable_label(self.view_mode == LibraryViewMode::List, "☰ List").clicked() {
+                        if ui.selectable_label(self.view_mode == LibraryViewMode::List, "List").clicked() {
                             self.view_mode = LibraryViewMode::List;
                         }
-                        if ui.selectable_label(self.view_mode == LibraryViewMode::Grid, "⊞ Grid").clicked() {
+                        if ui.selectable_label(self.view_mode == LibraryViewMode::Grid, "Grid").clicked() {
                             self.view_mode = LibraryViewMode::Grid;
                         }
 
@@ -353,7 +353,7 @@ impl LibraryState {
                         // Search box
                         ui.add(
                             egui::TextEdit::singleline(&mut self.search_query)
-                                .hint_text("🔍 Search notes...")
+                                .hint_text("Search notes...")
                                 .desired_width(140.0),
                         );
                     });
@@ -422,7 +422,7 @@ impl LibraryState {
                     let total_notes = self.items.len();
                     let total_pages: usize = self.items.iter().map(|m| m.page_count).sum();
                     ui.label(
-                        egui::RichText::new(format!("📚 {} Notebooks • {} Total Pages • Storage: {}", total_notes, total_pages, self.library_dir.display()))
+                        egui::RichText::new(format!("{} Notebooks - {} Total Pages - Storage: {}", total_notes, total_pages, self.library_dir.display()))
                             .size(10.5)
                             .color(p.text_muted),
                     );
@@ -432,7 +432,7 @@ impl LibraryState {
         // --- SUB-DIALOG: CREATE NEW NOTEBOOK ---
         if self.show_create_modal {
             let mut create_open = true;
-            egui::Window::new("✨ Create New Notebook")
+            egui::Window::new("Create New Notebook")
                 .open(&mut create_open)
                 .resizable(false)
                 .collapsible(false)
@@ -480,7 +480,7 @@ impl LibraryState {
             let mut do_rename = false;
             let mut cancel_rename = false;
 
-            egui::Window::new("✏️ Rename Notebook")
+            egui::Window::new("Rename Notebook")
                 .open(&mut rename_open)
                 .resizable(false)
                 .collapsible(false)
@@ -525,7 +525,7 @@ impl LibraryState {
             let mut do_delete = false;
             let mut cancel_del = false;
 
-            egui::Window::new("⚠️ Delete Notebook?")
+            egui::Window::new("Delete Notebook?")
                 .open(&mut del_open)
                 .resizable(false)
                 .collapsible(false)
@@ -696,7 +696,7 @@ impl LibraryState {
                 painter.text(
                     badge_rect.center(),
                     egui::Align2::CENTER_CENTER,
-                    "● ACTIVE",
+                    "ACTIVE",
                     egui::FontId::proportional(9.0),
                     Color32::WHITE,
                 );
@@ -707,7 +707,7 @@ impl LibraryState {
             let mut title_trimmed = meta.title.clone();
             if title_trimmed.len() > 24 {
                 title_trimmed.truncate(22);
-                title_trimmed.push('…');
+                title_trimmed.push_str("...");
             }
             painter.text(
                 title_pos,
@@ -718,7 +718,7 @@ impl LibraryState {
             );
 
             // Subtext: Pages & Modified Time
-            let sub_text = format!("{} page(s) • {}", meta.page_count, meta.format_modified());
+            let sub_text = format!("{} page(s) - {}", meta.page_count, meta.format_modified());
             painter.text(
                 Pos2::new(rect.min.x + 24.0, rect.min.y + 146.0),
                 egui::Align2::LEFT_TOP,
@@ -748,27 +748,27 @@ impl LibraryState {
 
         // Context menu for card
         resp.context_menu(|ui| {
-            if ui.button("📖 Open Notebook").clicked() {
+            if ui.button("Open Notebook").clicked() {
                 action = Some(LibraryAction::Open(meta.path.clone()));
                 ui.close_menu();
             }
-            if ui.button("📑 Duplicate").clicked() {
+            if ui.button("Duplicate").clicked() {
                 action = Some(LibraryAction::Duplicate(meta.path.clone()));
                 ui.close_menu();
             }
-            if ui.button("✏️ Rename").clicked() {
+            if ui.button("Rename").clicked() {
                 action = Some(LibraryAction::Rename {
                     path: meta.path.clone(),
                     new_title: meta.title.clone(),
                 });
                 ui.close_menu();
             }
-            if ui.button("📄 Export to PDF...").clicked() {
+            if ui.button("Export to PDF...").clicked() {
                 action = Some(LibraryAction::ExportPdf(meta.path.clone()));
                 ui.close_menu();
             }
             ui.separator();
-            if ui.button(egui::RichText::new("🗑️ Delete").color(Color32::from_rgb(220, 60, 60))).clicked() {
+            if ui.button(egui::RichText::new("Delete").color(Color32::from_rgb(220, 60, 60))).clicked() {
                 action = Some(LibraryAction::Delete(meta.path.clone()));
                 ui.close_menu();
             }
@@ -849,27 +849,27 @@ impl LibraryState {
         }
 
         resp.context_menu(|ui| {
-            if ui.button("📖 Open").clicked() {
+            if ui.button("Open").clicked() {
                 action = Some(LibraryAction::Open(meta.path.clone()));
                 ui.close_menu();
             }
-            if ui.button("📑 Duplicate").clicked() {
+            if ui.button("Duplicate").clicked() {
                 action = Some(LibraryAction::Duplicate(meta.path.clone()));
                 ui.close_menu();
             }
-            if ui.button("✏️ Rename").clicked() {
+            if ui.button("Rename").clicked() {
                 action = Some(LibraryAction::Rename {
                     path: meta.path.clone(),
                     new_title: meta.title.clone(),
                 });
                 ui.close_menu();
             }
-            if ui.button("📄 Export to PDF...").clicked() {
+            if ui.button("Export to PDF...").clicked() {
                 action = Some(LibraryAction::ExportPdf(meta.path.clone()));
                 ui.close_menu();
             }
             ui.separator();
-            if ui.button(egui::RichText::new("🗑️ Delete").color(Color32::from_rgb(220, 60, 60))).clicked() {
+            if ui.button(egui::RichText::new("Delete").color(Color32::from_rgb(220, 60, 60))).clicked() {
                 action = Some(LibraryAction::Delete(meta.path.clone()));
                 ui.close_menu();
             }

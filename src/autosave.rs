@@ -292,7 +292,7 @@ impl AutosaveManager {
         let mut open_folder = false;
         let mut close_clicked = false;
 
-        egui::Window::new("⚡ Autosave & Crash Recovery Settings")
+        egui::Window::new("Autosave & Crash Recovery Settings")
             .open(&mut is_open)
             .resizable(false)
             .collapsible(false)
@@ -441,7 +441,7 @@ impl AutosaveManager {
                         ui.add_space(4.0);
                         let dir_display = self.autosave_dir.display().to_string();
                         ui.label(
-                            egui::RichText::new(format!("📁 Folder: {}", dir_display))
+                            egui::RichText::new(format!("Folder: {}", dir_display))
                                 .size(10.5)
                                 .color(p.text_muted)
                                 .monospace(),
@@ -453,7 +453,7 @@ impl AutosaveManager {
                 ui.horizontal(|ui| {
                     if ui
                         .button(
-                            egui::RichText::new("📁 Open Autosave Folder")
+                            egui::RichText::new("Open Autosave Folder")
                                 .size(11.5)
                                 .color(p.text),
                         )
@@ -467,7 +467,7 @@ impl AutosaveManager {
                         .add_enabled(
                             self.enabled,
                             egui::Button::new(
-                                egui::RichText::new("💾 Snapshot Now")
+                                egui::RichText::new("Snapshot Now")
                                     .size(11.5)
                                     .color(p.accent)
                                     .strong(),

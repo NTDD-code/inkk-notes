@@ -24,6 +24,31 @@ impl<'a> From<&'a str> for ToolIcon<'a> {
             "axes" | "Axes" | "📐" => ToolIcon::Vector(VectorIcon::Axes),
             "table" | "Table" | "▦" => ToolIcon::Vector(VectorIcon::Table),
             "pdf" | "Pdf" | "export_pdf" => ToolIcon::Vector(VectorIcon::Pdf),
+            "move_up" | "MoveUp" | "▲" | "↑" => ToolIcon::Vector(VectorIcon::MoveUp),
+            "move_down" | "MoveDown" | "▼" | "↓" => ToolIcon::Vector(VectorIcon::MoveDown),
+            "duplicate" | "Duplicate" | "🗐" => ToolIcon::Vector(VectorIcon::Duplicate),
+            "delete" | "Delete" | "🗑" => ToolIcon::Vector(VectorIcon::Delete),
+            "add" | "Add" | "➕" | "+" => ToolIcon::Vector(VectorIcon::Add),
+            "close" | "Close" | "✖" | "x" | "X" => ToolIcon::Vector(VectorIcon::Close),
+            "undo" | "Undo" | "⟲" => ToolIcon::Vector(VectorIcon::Undo),
+            "redo" | "Redo" | "⟳" => ToolIcon::Vector(VectorIcon::Redo),
+            "pen" | "Pen" | "✏" => ToolIcon::Vector(VectorIcon::Pen),
+            "highlighter" | "Highlighter" | "🖊" => ToolIcon::Vector(VectorIcon::Highlighter),
+            "eraser_stroke" | "EraserStroke" => ToolIcon::Vector(VectorIcon::EraserStroke),
+            "eraser_point" | "EraserPoint" | "✂" => ToolIcon::Vector(VectorIcon::EraserPoint),
+            "lasso" | "Lasso" => ToolIcon::Vector(VectorIcon::Lasso),
+            "pan" | "Pan" | "✋" => ToolIcon::Vector(VectorIcon::Pan),
+            "ruler" | "Ruler" | "📏" => ToolIcon::Vector(VectorIcon::Ruler),
+            "protractor" | "Protractor" => ToolIcon::Vector(VectorIcon::Protractor),
+            "picture" | "Picture" | "🖼" => ToolIcon::Vector(VectorIcon::Picture),
+            "sun" | "Sun" | "☀" => ToolIcon::Vector(VectorIcon::Sun),
+            "moon" | "Moon" | "🌙" => ToolIcon::Vector(VectorIcon::Moon),
+            "prev" | "Prev" | "◀" => ToolIcon::Vector(VectorIcon::Prev),
+            "next" | "Next" | "▶" => ToolIcon::Vector(VectorIcon::Next),
+            "extend" | "Extend" | "⬇" => ToolIcon::Vector(VectorIcon::Extend),
+            "fit" | "Fit" | "⛶" => ToolIcon::Vector(VectorIcon::Fit),
+            "check" | "Check" | "✔" => ToolIcon::Vector(VectorIcon::Check),
+            "warn" | "Warn" | "⚠" => ToolIcon::Vector(VectorIcon::Warn),
             glyph => ToolIcon::Glyph(glyph),
         }
     }
@@ -85,6 +110,62 @@ pub fn tool_button<'a>(
                 let icon_size = 19.0;
                 let icon_rect = Rect::from_center_size(rect.center(), Vec2::splat(icon_size));
                 v.paint(painter, icon_rect, fg, 1.8);
+            }
+        }
+    }
+    resp.on_hover_text(tooltip)
+}
+
+/// Compact square icon button (22x22 px) for cards, drawer items, and compact toolbars.
+pub fn small_tool_button<'a>(
+    ui: &mut Ui,
+    p: &Palette,
+    icon: impl Into<ToolIcon<'a>>,
+    active: bool,
+    tooltip: &str,
+) -> Response {
+    let icon = icon.into();
+    let size = Vec2::splat(22.0);
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    resp.widget_info(|| {
+        WidgetInfo::selected(
+            WidgetType::SelectableLabel,
+            ui.is_enabled(),
+            active,
+            tooltip,
+        )
+    });
+
+    if ui.is_rect_visible(rect) {
+        let painter = ui.painter();
+        let (fill, stroke, fg) = if active {
+            (p.accent_soft, Stroke::new(1.0_f32, p.accent), p.accent)
+        } else if resp.hovered() {
+            (p.hover, Stroke::NONE, p.text)
+        } else {
+            (Color32::TRANSPARENT, Stroke::NONE, p.text_muted)
+        };
+        let fg = if ui.is_enabled() {
+            fg
+        } else {
+            p.text_muted.gamma_multiply(0.45)
+        };
+        painter.rect(rect, theme::RADIUS_SM, fill, stroke);
+
+        match icon {
+            ToolIcon::Glyph(s) => {
+                painter.text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    s,
+                    egui::FontId::proportional(13.0),
+                    fg,
+                );
+            }
+            ToolIcon::Vector(v) => {
+                let icon_size = 14.0;
+                let icon_rect = Rect::from_center_size(rect.center(), Vec2::splat(icon_size));
+                v.paint(painter, icon_rect, fg, 1.6);
             }
         }
     }

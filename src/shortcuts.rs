@@ -90,25 +90,35 @@ impl KeyCombo {
 
         if self.ctrl == ctrl_down && self.shift == shift_down && self.alt == alt_down {
             ctx.input_mut(|i| {
-                i.consume_key(
-                    egui::Modifiers {
-                        alt: self.alt,
-                        ctrl: self.ctrl,
-                        shift: self.shift,
-                        mac_cmd: false,
-                        command: false,
-                    },
-                    egui_key,
-                ) || i.consume_key(
-                    egui::Modifiers {
-                        alt: self.alt,
-                        ctrl: self.ctrl,
-                        shift: self.shift,
-                        mac_cmd: false,
-                        command: true,
-                    },
-                    egui_key,
-                ) || i.key_pressed(egui_key)
+                let mut triggered = false;
+                i.events.retain(|event| {
+                    match event {
+                        egui::Event::Key { key, pressed: true, modifiers, .. } => {
+                            let matches_ctrl = self.ctrl == (modifiers.ctrl || modifiers.command);
+                            let matches_shift = self.shift == modifiers.shift;
+                            let matches_alt = self.alt == modifiers.alt;
+                            if *key == egui_key && matches_ctrl && matches_shift && matches_alt {
+                                triggered = true;
+                                return false; // consume event
+                            }
+                        }
+                        egui::Event::Copy if egui_key == egui::Key::C && self.ctrl && !self.shift && !self.alt => {
+                            triggered = true;
+                            return false;
+                        }
+                        egui::Event::Cut if egui_key == egui::Key::X && self.ctrl && !self.shift && !self.alt => {
+                            triggered = true;
+                            return false;
+                        }
+                        egui::Event::Paste(_) if egui_key == egui::Key::V && self.ctrl && !self.shift && !self.alt => {
+                            triggered = true;
+                            return false;
+                        }
+                        _ => {}
+                    }
+                    true
+                });
+                triggered
             })
         } else {
             false
@@ -671,7 +681,7 @@ impl ShortcutsDialogState {
         let win_w = 780.0f32.min(screen_size.x - 40.0);
         let win_h = 580.0f32.min(screen_size.y - 40.0);
 
-        egui::Window::new("⌨ Keyboard Shortcuts & Keybindings")
+        egui::Window::new("Keyboard Shortcuts & Keybindings")
             .open(&mut is_window_open)
             .collapsible(false)
             .resizable(true)
@@ -710,7 +720,7 @@ impl ShortcutsDialogState {
 
                 // Filter & Search bar
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("🔍 Search:").size(12.5).color(text_muted));
+                    ui.label(egui::RichText::new("Search:").size(12.5).color(text_muted));
                     ui.add(
                         egui::TextEdit::singleline(&mut self.search_query)
                             .hint_text("Search by action, description, or key...")
@@ -847,7 +857,7 @@ impl ShortcutsDialogState {
                                                 // Record / Change Button
                                                 if is_recording_this {
                                                     let rec_btn = egui::Button::new(
-                                                        egui::RichText::new("⏳ Press key... (Esc to cancel)")
+                                                        egui::RichText::new("Press key... (Esc to cancel)")
                                                             .size(12.0)
                                                             .strong()
                                                             .color(Color32::WHITE),
@@ -908,7 +918,7 @@ impl ShortcutsDialogState {
                     if let Some((ref msg, at)) = self.status_feedback {
                         if at.elapsed().as_secs_f32() < 4.0 {
                             ui.label(
-                                egui::RichText::new(format!("✓ {}", msg))
+                                egui::RichText::new(format!("Done: {}", msg))
                                     .size(12.0)
                                     .color(Color32::from_rgb(0x8A, 0xC4, 0x8A)),
                             );
@@ -936,7 +946,7 @@ impl ShortcutsDialogState {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    egui::RichText::new("💾 Save Shortcuts")
+                                    egui::RichText::new("Save Shortcuts")
                                         .size(12.5)
                                         .strong()
                                         .color(Color32::WHITE),

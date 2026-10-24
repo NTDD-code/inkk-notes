@@ -40,7 +40,7 @@ impl MathRenderer {
             );
         }
 
-        // Close / Delete '×' button at top-right
+        // Close / Delete button at top-right
         let btn_size = (20.0 * scale).clamp(16.0, 24.0);
         let close_center = card_rect.right_top() + Vec2::new(-btn_size * 0.75, btn_size * 0.75);
         painter.circle_filled(
@@ -48,28 +48,18 @@ impl MathRenderer {
             btn_size * 0.42,
             palette.danger.gamma_multiply(0.18),
         );
-        painter.text(
-            close_center,
-            egui::Align2::CENTER_CENTER,
-            "×",
-            egui::FontId::proportional(btn_size * 0.60),
-            palette.danger,
-        );
+        let close_icon_rect = Rect::from_center_size(close_center, Vec2::splat(btn_size * 0.5));
+        crate::vector_icon::VectorIcon::Close.paint(painter, close_icon_rect, palette.danger, 1.5);
 
-        // Edit '✏' button next to close button
+        // Edit button next to close button
         let edit_center = close_center - Vec2::new(btn_size * 1.05, 0.0);
         painter.circle_filled(
             edit_center,
             btn_size * 0.42,
             palette.accent.gamma_multiply(0.18),
         );
-        painter.text(
-            edit_center,
-            egui::Align2::CENTER_CENTER,
-            "✏",
-            egui::FontId::proportional(btn_size * 0.48),
-            palette.accent,
-        );
+        let edit_icon_rect = Rect::from_center_size(edit_center, Vec2::splat(btn_size * 0.5));
+        crate::vector_icon::VectorIcon::Pen.paint(painter, edit_icon_rect, palette.accent, 1.5);
 
         // Check for dedicated 1D number line or 3D coordinate space
         if plot.dimension.as_deref() == Some("1D") {
@@ -347,7 +337,7 @@ impl MathRenderer {
             ),
         );
 
-        // Close / Delete '×' button at top-right
+        // Close / Delete button at top-right
         let btn_size = (18.0 * scale).clamp(14.0, 22.0);
         let close_center = card_rect.right_top() + Vec2::new(-btn_size * 0.65, btn_size * 0.65);
         painter.circle_filled(
@@ -355,28 +345,18 @@ impl MathRenderer {
             btn_size * 0.4,
             palette.danger.gamma_multiply(0.18),
         );
-        painter.text(
-            close_center,
-            egui::Align2::CENTER_CENTER,
-            "×",
-            egui::FontId::proportional(btn_size * 0.6),
-            palette.danger,
-        );
+        let close_icon_rect = Rect::from_center_size(close_center, Vec2::splat(btn_size * 0.5));
+        crate::vector_icon::VectorIcon::Close.paint(painter, close_icon_rect, palette.danger, 1.4);
 
-        // Edit '✏' button next to close button
+        // Edit button next to close button
         let edit_center = close_center - Vec2::new(btn_size * 1.05, 0.0);
         painter.circle_filled(
             edit_center,
             btn_size * 0.4,
             palette.accent.gamma_multiply(0.18),
         );
-        painter.text(
-            edit_center,
-            egui::Align2::CENTER_CENTER,
-            "✏",
-            egui::FontId::proportional(btn_size * 0.48),
-            palette.accent,
-        );
+        let edit_icon_rect = Rect::from_center_size(edit_center, Vec2::splat(btn_size * 0.5));
+        crate::vector_icon::VectorIcon::Pen.paint(painter, edit_icon_rect, palette.accent, 1.4);
 
         let bracket_color = palette.accent;
         let bracket_stroke = Stroke::new(2.0 * scale.min(1.5), bracket_color);
@@ -476,7 +456,7 @@ impl MathRenderer {
         painter.rect_filled(grid_rect, 4.0, bg);
         painter.rect_stroke(grid_rect, 4.0, Stroke::new(1.5_f32, palette.border));
 
-        // Close / Delete '×' button at top-right
+        // Close / Delete button at top-right
         let btn_size = (18.0 * scale).clamp(14.0, 22.0);
         let close_center = grid_rect.right_top() + Vec2::new(-btn_size * 0.75, btn_size * 0.75);
         painter.circle_filled(
@@ -484,28 +464,18 @@ impl MathRenderer {
             btn_size * 0.4,
             palette.danger.gamma_multiply(0.2),
         );
-        painter.text(
-            close_center,
-            egui::Align2::CENTER_CENTER,
-            "×",
-            egui::FontId::proportional(btn_size * 0.6),
-            palette.danger,
-        );
+        let close_icon_rect = Rect::from_center_size(close_center, Vec2::splat(btn_size * 0.5));
+        crate::vector_icon::VectorIcon::Close.paint(painter, close_icon_rect, palette.danger, 1.4);
 
-        // Edit '✏' button next to close button
+        // Edit button next to close button
         let edit_center = close_center - Vec2::new(btn_size * 1.05, 0.0);
         painter.circle_filled(
             edit_center,
             btn_size * 0.4,
             palette.accent.gamma_multiply(0.18),
         );
-        painter.text(
-            edit_center,
-            egui::Align2::CENTER_CENTER,
-            "✏",
-            egui::FontId::proportional(btn_size * 0.48),
-            palette.accent,
-        );
+        let edit_icon_rect = Rect::from_center_size(edit_center, Vec2::splat(btn_size * 0.5));
+        crate::vector_icon::VectorIcon::Pen.paint(painter, edit_icon_rect, palette.accent, 1.4);
 
         // Horizontal grid lines
         for r in 1..grid.rows {

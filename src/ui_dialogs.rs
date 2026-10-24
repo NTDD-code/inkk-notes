@@ -157,9 +157,9 @@ impl MatrixDialogState {
         }
 
         let title = if self.editing_id.is_some() {
-            "✏️ Edit Matrix"
+            "Edit Matrix"
         } else {
-            "📊 Insert Matrix"
+            "Insert Matrix"
         };
 
         let mut is_open = self.is_open;
@@ -172,11 +172,11 @@ impl MatrixDialogState {
             .default_pos(ctx.screen_rect().center())
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.mode, MatrixInputMode::UI, "🎛️ UI (Grid Inputs)");
+                    ui.selectable_value(&mut self.mode, MatrixInputMode::UI, "UI (Grid Inputs)");
                     ui.selectable_value(
                         &mut self.mode,
                         MatrixInputMode::Code,
-                        "💻 Code (MATLAB Syntax)",
+                        "Code (MATLAB Syntax)",
                     );
                 });
                 ui.separator();
@@ -218,7 +218,7 @@ impl MatrixDialogState {
 
                         ui.add_space(4.0);
                         ui.label(
-                            egui::RichText::new("💡 Enter cell values (empty cells default to 0):")
+                            egui::RichText::new("Enter cell values (empty cells default to 0):")
                                 .small()
                                 .color(palette.text_muted),
                         );
@@ -266,14 +266,14 @@ impl MatrixDialogState {
                             });
 
                         ui.horizontal(|ui| {
-                            if ui.button("3×3 Identity").clicked() {
+                            if ui.button("3x3 Identity").clicked() {
                                 self.code_input = "[1 0 0; 0 1 0; 0 0 1]".to_string();
                             }
-                            if ui.button("2×2 Rotation").clicked() {
+                            if ui.button("2x2 Rotation").clicked() {
                                 self.code_input =
                                     "[cos(pi/4) -sin(pi/4); sin(pi/4) cos(pi/4)]".to_string();
                             }
-                            if ui.button("3×3 Magic").clicked() {
+                            if ui.button("3x3 Magic").clicked() {
                                 self.code_input = "magic(3)".to_string();
                             }
                         });
@@ -282,7 +282,7 @@ impl MatrixDialogState {
 
                 if let Some(ref err) = self.error_msg {
                     ui.add_space(4.0);
-                    ui.colored_label(palette.danger, format!("⚠️ Error: {}", err));
+                    ui.colored_label(palette.danger, format!("Error: {}", err));
                 }
 
                 ui.add_space(10.0);
@@ -291,9 +291,9 @@ impl MatrixDialogState {
 
                 ui.horizontal(|ui| {
                     let export_label = if self.editing_id.is_some() {
-                        "💾 Update on Canvas"
+                        "Update on Canvas"
                     } else {
-                        "🚀 Export to Canvas"
+                        "Export to Canvas"
                     };
 
                     let btn = ui.add(
@@ -561,9 +561,9 @@ impl AxesDialogState {
         }
 
         let win_title = if self.editing_id.is_some() {
-            "✏️ Edit Coordinate Axes"
+            "Edit Coordinate Axes"
         } else {
-            "📐 Coordinate Axes (1D / 2D / 3D)"
+            "Coordinate Axes (1D / 2D / 3D)"
         };
 
         let mut is_open = self.is_open;
@@ -576,8 +576,8 @@ impl AxesDialogState {
             .default_pos(ctx.screen_rect().center())
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.mode, AxesInputMode::UI, "🎛️ UI (Visual)");
-                    ui.selectable_value(&mut self.mode, AxesInputMode::Code, "💻 Code (MATLAB)");
+                    ui.selectable_value(&mut self.mode, AxesInputMode::UI, "UI (Visual)");
+                    ui.selectable_value(&mut self.mode, AxesInputMode::Code, "Code (MATLAB)");
                 });
                 ui.separator();
 
@@ -586,10 +586,10 @@ impl AxesDialogState {
                     ui.selectable_value(
                         &mut self.dimension,
                         AxesDimension::D1,
-                        "📏 1D (Number Line)",
+                        "1D (Number Line)",
                     );
-                    ui.selectable_value(&mut self.dimension, AxesDimension::D2, "📐 2D (Oxy)");
-                    ui.selectable_value(&mut self.dimension, AxesDimension::D3, "🧊 3D (Oxyz)");
+                    ui.selectable_value(&mut self.dimension, AxesDimension::D2, "2D (Oxy)");
+                    ui.selectable_value(&mut self.dimension, AxesDimension::D3, "3D (Oxyz)");
                 });
                 ui.separator();
 
@@ -606,7 +606,7 @@ impl AxesDialogState {
                         match self.dimension {
                             AxesDimension::D1 => {
                                 ui.group(|ui| {
-                                    ui.label(egui::RichText::new("📏 1D Number Line").strong());
+                                    ui.label(egui::RichText::new("1D Number Line").strong());
                                     ui.horizontal(|ui| {
                                         ui.label("X Min:");
                                         ui.add(egui::DragValue::new(&mut self.x_min).speed(0.5));
@@ -631,7 +631,7 @@ impl AxesDialogState {
                             AxesDimension::D2 => {
                                 ui.group(|ui| {
                                     ui.label(
-                                        egui::RichText::new("📐 Horizontal Axis (X)").strong(),
+                                        egui::RichText::new("Horizontal Axis (X)").strong(),
                                     );
                                     ui.horizontal(|ui| {
                                         ui.label("X Min:");
@@ -648,7 +648,7 @@ impl AxesDialogState {
                                 });
 
                                 ui.group(|ui| {
-                                    ui.label(egui::RichText::new("📐 Vertical Axis (Y)").strong());
+                                    ui.label(egui::RichText::new("Vertical Axis (Y)").strong());
                                     ui.horizontal(|ui| {
                                         ui.label("Y Min:");
                                         ui.add(egui::DragValue::new(&mut self.y_min).speed(0.5));
@@ -668,7 +668,7 @@ impl AxesDialogState {
                             AxesDimension::D3 => {
                                 ui.group(|ui| {
                                     ui.label(
-                                        egui::RichText::new("🧊 3D Coordinate Space (Oxyz)")
+                                        egui::RichText::new("3D Coordinate Space (Oxyz)")
                                             .strong(),
                                     );
                                     ui.horizontal(|ui| {
@@ -732,7 +732,7 @@ impl AxesDialogState {
 
                 if let Some(ref err) = self.error_msg {
                     ui.add_space(4.0);
-                    ui.colored_label(palette.danger, format!("⚠️ Error: {}", err));
+                    ui.colored_label(palette.danger, format!("Error: {}", err));
                 }
 
                 ui.add_space(10.0);
@@ -741,9 +741,9 @@ impl AxesDialogState {
 
                 ui.horizontal(|ui| {
                     let export_label = if self.editing_id.is_some() {
-                        "💾 Update Coordinate Axes"
+                        "Update Coordinate Axes"
                     } else {
-                        "🚀 Export to Canvas"
+                        "Export to Canvas"
                     };
 
                     let btn = ui.add(
@@ -1010,9 +1010,9 @@ impl TableDialogState {
         }
 
         let win_title = if self.editing_id.is_some() {
-            "✏️ Edit Table"
+            "Edit Table"
         } else {
-            "▦ Table Generator"
+            "Table Generator"
         };
 
         let mut is_open = self.is_open;
@@ -1025,11 +1025,11 @@ impl TableDialogState {
             .default_pos(ctx.screen_rect().center())
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.mode, TableInputMode::UI, "🎛️ UI (Grid Inputs)");
+                    ui.selectable_value(&mut self.mode, TableInputMode::UI, "UI (Grid Inputs)");
                     ui.selectable_value(
                         &mut self.mode,
                         TableInputMode::Code,
-                        "💻 Code (CSV / Markdown)",
+                        "Code (CSV / Markdown)",
                     );
                 });
                 ui.separator();
@@ -1113,7 +1113,7 @@ impl TableDialogState {
 
                 if let Some(ref err) = self.error_msg {
                     ui.add_space(4.0);
-                    ui.colored_label(palette.danger, format!("⚠️ Error: {}", err));
+                    ui.colored_label(palette.danger, format!("Error: {}", err));
                 }
 
                 ui.add_space(10.0);
@@ -1122,9 +1122,9 @@ impl TableDialogState {
 
                 ui.horizontal(|ui| {
                     let export_label = if self.editing_id.is_some() {
-                        "💾 Update Table"
+                        "Update Table"
                     } else {
-                        "🚀 Export to Canvas"
+                        "Export to Canvas"
                     };
 
                     let btn = ui.add(
