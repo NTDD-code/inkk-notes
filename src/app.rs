@@ -847,7 +847,7 @@ impl InkkApp {
                 && page.grids.is_empty()
                 && page.flowcharts.is_empty()
             {
-                self.set_status("Nothing to copy. Draw strokes or use Lasso (7) to select. 💡");
+                self.set_status("Nothing to copy. Draw strokes or use Lasso (7) to select.");
                 return false;
             }
             (
@@ -863,7 +863,7 @@ impl InkkApp {
         let stroke_count = strokes.len();
         let total_count = stroke_count + images.len() + plots.len() + matrices.len() + grids.len() + flowcharts.len();
         if total_count == 0 {
-            self.set_status("Nothing to copy. Select strokes with Lasso (7) first. 💡");
+            self.set_status("Nothing to copy. Select strokes with Lasso (7) first.");
             return false;
         }
 
@@ -884,14 +884,14 @@ impl InkkApp {
         }
 
         self.internal_clipboard = Some(bundle);
-        self.set_status(&format!("Copied {} item(s) ({} stroke(s)) to clipboard! 📋", total_count, stroke_count));
+        self.set_status(&format!("Copied {} item(s) ({} stroke(s)) to clipboard.", total_count, stroke_count));
         true
     }
 
     fn cut_selected(&mut self) {
         if self.copy_selected() {
             self.delete_selected();
-            self.set_status("Cut selected item(s) to clipboard! ✂");
+            self.set_status("Cut selected item(s) to clipboard.");
         }
     }
 
@@ -921,7 +921,7 @@ impl InkkApp {
             + grid_ids.len()
             + flow_ids.len();
         if total_count == 0 {
-            self.set_status("Page is empty — nothing to select. ✍");
+            self.set_status("Page is empty - nothing to select.");
             return;
         }
         self.clear_selection();
@@ -932,7 +932,7 @@ impl InkkApp {
         self.selected_grid_ids.extend(grid_ids);
         self.selected_flowchart_ids.extend(flow_ids);
         self.set_tool(ToolMode::LassoSelect);
-        self.set_status(&format!("Selected all {} items ({} strokes) on page ⛶", total_count, stroke_count));
+        self.set_status(&format!("Selected all {} items ({} strokes) on page.", total_count, stroke_count));
     }
 
     fn paste_bundle(&mut self, bundle: crate::model::InkkClipboardBundle) {
@@ -1089,7 +1089,7 @@ impl InkkApp {
         self.set_tool(ToolMode::LassoSelect);
         self.autosave.mark_dirty();
         self.set_status(&format!(
-            "Pasted {} item(s) ({} stroke(s)) onto canvas! 📋",
+            "Pasted {} item(s) ({} stroke(s)) onto canvas.",
             total_count, pasted_strokes
         ));
     }
@@ -1099,7 +1099,7 @@ impl InkkApp {
         let target_x = ((available_size.x - page.width * self.scale) * 0.5).max(40.0);
         let target_y = ((available_size.y - page.height * self.scale) * 0.5).max(40.0);
         self.pan = Vec2::new(target_x, target_y);
-        self.set_status("Canvas centered on page 🎯");
+        self.set_status("Canvas centered on page.");
     }
 
     fn delete_selected(&mut self) {
@@ -2939,13 +2939,66 @@ impl InkkApp {
         use egui::{Key, Modifiers};
         let pressed = |m: Modifiers, k: Key| ctx.input_mut(|i| i.consume_key(m, k));
 
-        // Prioritize Paste: If user presses Ctrl+V and is not editing a text box, paste image/file immediately!
-        let ctrl_v = pressed(Modifiers::COMMAND, Key::V)
-            || pressed(Modifiers::CTRL, Key::V)
-            || ctx.input(|i| (i.modifiers.ctrl || i.modifiers.command) && i.key_pressed(Key::V));
-        if ctrl_v && self.editing_text_id.is_none() {
-            self.paste_from_clipboard();
-            return;
+        let (ctrl_down, shift_down, alt_down) = ctx.input(|i| {
+            (
+                i.modifiers.ctrl || i.modifiers.command,
+                i.modifiers.shift,
+                i.modifiers.alt,
+            )
+        });
+
+        // 1. Whiteboard Canvas Shortcuts: Copy, Cut, Paste, Duplicate, Select All
+        // When user is not editing an inline text box, process these first!
+        if self.editing_text_id.is_none() {
+            let key_c = (ctrl_down && !shift_down && !alt_down) && ctx.input_mut(|i| {
+                i.consume_key(Modifiers::COMMAND, Key::C)
+                    || i.consume_key(Modifiers::CTRL, Key::C)
+                    || i.key_pressed(Key::C)
+            });
+            if key_c {
+                self.copy_selected();
+                return;
+            }
+
+            let key_x = (ctrl_down && !shift_down && !alt_down) && ctx.input_mut(|i| {
+                i.consume_key(Modifiers::COMMAND, Key::X)
+                    || i.consume_key(Modifiers::CTRL, Key::X)
+                    || i.key_pressed(Key::X)
+            });
+            if key_x {
+                self.cut_selected();
+                return;
+            }
+
+            let key_v = (ctrl_down && !shift_down && !alt_down) && ctx.input_mut(|i| {
+                i.consume_key(Modifiers::COMMAND, Key::V)
+                    || i.consume_key(Modifiers::CTRL, Key::V)
+                    || i.key_pressed(Key::V)
+            });
+            if key_v {
+                self.paste_from_clipboard();
+                return;
+            }
+
+            let key_d = (ctrl_down && !shift_down && !alt_down) && ctx.input_mut(|i| {
+                i.consume_key(Modifiers::COMMAND, Key::D)
+                    || i.consume_key(Modifiers::CTRL, Key::D)
+                    || i.key_pressed(Key::D)
+            });
+            if key_d {
+                self.duplicate_selected();
+                return;
+            }
+
+            let key_a = (ctrl_down && !shift_down && !alt_down) && ctx.input_mut(|i| {
+                i.consume_key(Modifiers::COMMAND, Key::A)
+                    || i.consume_key(Modifiers::CTRL, Key::A)
+                    || i.key_pressed(Key::A)
+            });
+            if key_a {
+                self.select_all();
+                return;
+            }
         }
 
         // Don't steal keys while the user is actively typing in a text widget.

@@ -96,10 +96,19 @@ impl KeyCombo {
                         ctrl: self.ctrl,
                         shift: self.shift,
                         mac_cmd: false,
-                        command: self.ctrl,
+                        command: false,
                     },
                     egui_key,
-                )
+                ) || i.consume_key(
+                    egui::Modifiers {
+                        alt: self.alt,
+                        ctrl: self.ctrl,
+                        shift: self.shift,
+                        mac_cmd: false,
+                        command: true,
+                    },
+                    egui_key,
+                ) || i.key_pressed(egui_key)
             })
         } else {
             false
