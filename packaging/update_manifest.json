@@ -2,8 +2,8 @@
     "version":  "0.1.2",
     "release_date":  "2026-10-25",
     "title":  "Inkk 0.1.2",
-    "release_notes":  "What's new in Inkk v0.1.2:\n- Flowchart Shapes Menu: Dedicated left sidebar palette with standard flowchart shapes (Process, Decision, Terminator, Data I/O, Subroutine, Document, Database)\n- Interactive Flowchart Connections: Hover connection anchor dots on block edges; clicking an anchor opens quick-picker to create and auto-connect the next block with an arrow\n- Precision Lasso selection: Enclosure ratio and centroid filtering to accurately select individual strokes without grabbing nearby strokes or background cards\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window\n- Auto-update alert: Automatically displays update modal when a newer version is available\n- Splash screen version indicator: Displays current version dynamically",
+    "release_notes":  "What's new in Inkk v0.1.2:\n- Whiteboard-native Flowcharting: Flowchart shapes and directional connecting arrows lie directly on the whiteboard canvas with zero popup windows\n- Interactive Anchor Connection Dots: Hover connection dots appear on block edges; clicking an anchor opens quick-picker to auto-connect the next block with an arrow\n- In-place Node Editing: Double-click or use inline controls directly on the canvas to edit shape labels\n- Precision Lasso Selection: Enclosure ratio and centroid filtering to accurately select individual strokes without grabbing nearby strokes or background cards\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window\n- Auto-update alert: Automatically displays update modal when a newer version is available\n- Splash screen version indicator: Displays current version dynamically",
     "download_url":  "https://github.com/NTDD-code/inkk-notes/releases/latest",
     "mandatory":  false,
-    "sha256":  "881227E3A0B376818F28F1BA599A152738E704D2BEFB560A169319ADBF18D480"
+    "sha256":  "A09974E2AAB44F58377FEBAE6688065F0BC9298F7073BDFC9D218E6A02D12816"
 }

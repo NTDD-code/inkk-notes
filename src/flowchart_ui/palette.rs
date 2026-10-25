@@ -19,6 +19,8 @@ pub struct FlowchartUiState {
     pub dragging_node: Option<(NodeId, Pos2)>,
     pub editing_node_id: Option<NodeId>,
     pub edit_label_buffer: String,
+    pub applied_label_change: Option<(NodeId, String)>,
+    pub req_delete_node_id: Option<NodeId>,
     pub is_panel_open: bool,
     pub active_flowchart_id: Option<String>,
 }
@@ -33,7 +35,7 @@ impl FlowchartPalette {
         page: &mut Page,
         palette: &Palette,
         is_dark: bool,
-        open_code_editor: &mut bool,
+        _open_code_editor: &mut bool,
         req_bake_svg: &mut Option<String>,
         view_center_world: Pos2,
     ) {
@@ -89,59 +91,59 @@ impl FlowchartPalette {
                             BlockKind::Start,
                             VectorIcon::ShapeOval,
                             "Start / End",
-                            "Bắt đầu / Kết thúc",
+                            "Terminal: start or end of flow",
                         ),
                         (
                             BlockKind::Process,
                             VectorIcon::ShapeRectangle,
                             "Process",
-                            "Tiến trình / Xử lý",
+                            "Action, task or calculation",
                         ),
                         (
                             BlockKind::Decision,
                             VectorIcon::ShapeDiamond,
                             "Decision",
-                            "Điều kiện / Rẽ nhánh",
+                            "Conditional branch (Yes / No)",
                         ),
                         (
                             BlockKind::Input,
                             VectorIcon::ShapeParallelogram,
-                            "Input / Output",
-                            "Nhập / Xuất dữ liệu",
+                            "Data I/O",
+                            "Input or output operation",
                         ),
                         (
                             BlockKind::Connector,
                             VectorIcon::ShapeCircle,
                             "Connector",
-                            "Điểm nối",
+                            "Diagram connection point",
                         ),
                         (
                             BlockKind::Subroutine,
                             VectorIcon::ShapeSubroutine,
                             "Subroutine",
-                            "Khối chương trình con",
+                            "Predefined process or call",
                         ),
                         (
                             BlockKind::LoopFor,
                             VectorIcon::ShapeHexagon,
                             "Preparation",
-                            "Vòng lặp / Chuẩn bị",
+                            "Loop or initialization step",
                         ),
                         (
                             BlockKind::Database,
                             VectorIcon::ShapeDatabase,
                             "Database",
-                            "Cơ sở dữ liệu",
+                            "Direct access data storage",
                         ),
                         (
                             BlockKind::Document,
                             VectorIcon::ShapeDocument,
                             "Document",
-                            "Tài liệu / Bản in",
+                            "Printed document or report",
                         ),
                     ];
 
-                    for (kind, icon, label_en, label_vi) in shapes {
+                    for (kind, icon, label_title, label_desc) in shapes {
                         let btn_rect = ui.available_rect_before_wrap();
                         let item_h = 38.0;
                         let rect = Rect::from_min_size(btn_rect.min, Vec2::new(btn_rect.width(), item_h));
@@ -175,18 +177,18 @@ impl FlowchartPalette {
                             1.8,
                         );
 
-                        // Label text
+                        // Label text (pure English)
                         ui.painter().text(
                             rect.min + Vec2::new(40.0, 11.0),
                             egui::Align2::LEFT_TOP,
-                            label_en,
+                            label_title,
                             egui::FontId::proportional(12.5),
                             palette.text,
                         );
                         ui.painter().text(
                             rect.min + Vec2::new(40.0, 23.0),
                             egui::Align2::LEFT_TOP,
-                            label_vi,
+                            label_desc,
                             egui::FontId::proportional(10.0),
                             palette.text_muted,
                         );
@@ -210,20 +212,9 @@ impl FlowchartPalette {
                     );
                     ui.add_space(6.0);
 
-                    // Add new flowchart diagram
-                    if ui.button("+ Add New Flowchart Diagram").clicked() {
-                        let new_ent = FlowchartEntity {
-                            title: "New Flowchart".to_string(),
-                            x: view_center_world.x - 180.0,
-                            y: view_center_world.y - 120.0,
-                            width: 420.0,
-                            height: 300.0,
-                            dsl_source: String::new(),
-                            graph: Some(FlowchartGraph::new()),
-                            ..Default::default()
-                        };
-                        state.active_flowchart_id = Some(new_ent.id.clone());
-                        page.flowcharts.push(new_ent);
+                    // Add new flowchart diagram directly on whiteboard
+                    if ui.button("+ Add Shape to Board").clicked() {
+                        Self::add_shape_to_canvas(page, state, BlockKind::Process, view_center_world);
                     }
 
                     // Auto-align layout
@@ -246,11 +237,6 @@ impl FlowchartPalette {
                                 }
                             }
                         }
-                    }
-
-                    // Open DSL code editor
-                    if ui.button("Open DSL Code Editor").clicked() {
-                        *open_code_editor = true;
                     }
 
                     // Bake SVG to whiteboard image

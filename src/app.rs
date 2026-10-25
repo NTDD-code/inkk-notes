@@ -4182,15 +4182,13 @@ impl eframe::App for InkkApp {
                         let effective_cursor = self.ruler.snap_point(cursor).unwrap_or(cursor);
                         let world = self.to_world(effective_cursor);
 
-                        // Check if user clicked on the '✕' close button or '✏' edit button of any plot, matrix, table grid, or flowchart
+                        // Check if user clicked on the close button or edit button of any plot, matrix, or table grid
                         let mut delete_plot_idx = None;
                         let mut delete_mat_idx = None;
                         let mut delete_grid_idx = None;
-                        let mut delete_flow_idx = None;
                         let mut edit_plot_idx = None;
                         let mut edit_mat_idx = None;
                         let mut edit_grid_idx = None;
-                        let mut edit_flow_idx = None;
                         {
                             let page = self.notebook.current_page();
                             let scale = self.scale;
@@ -4253,26 +4251,6 @@ impl eframe::App for InkkApp {
                                     }
                                 }
                             }
-                            // 4. Flowchart close and edit button
-                            if delete_plot_idx.is_none() && edit_plot_idx.is_none() && delete_mat_idx.is_none() && edit_mat_idx.is_none() && delete_grid_idx.is_none() && edit_grid_idx.is_none() {
-                                for (idx, flow) in page.flowcharts.iter().enumerate() {
-                                    let card_min = self.to_screen(Pos2::new(flow.x, flow.y));
-                                    let card_size = Vec2::new(flow.width * scale, flow.height * scale);
-                                    let card_rect = Rect::from_min_size(card_min, card_size);
-                                    let header_h = (28.0 * scale).clamp(24.0, 36.0);
-                                    let close_center = card_rect.right_top() + Vec2::new(-14.0 * scale, header_h * 0.5);
-                                    let edit_btn_w = 46.0 * scale;
-                                    let edit_center = card_rect.right_top() + Vec2::new(-edit_btn_w * 0.5 - 32.0 * scale, header_h * 0.5);
-                                    if cursor.distance(close_center) <= (14.0 * scale).max(14.0) {
-                                        delete_flow_idx = Some(idx);
-                                        break;
-                                    }
-                                    if cursor.distance(edit_center) <= (22.0 * scale).max(16.0) {
-                                        edit_flow_idx = Some(idx);
-                                        break;
-                                    }
-                                }
-                            }
                         }
 
                         if let Some(idx) = edit_plot_idx {
@@ -4284,9 +4262,6 @@ impl eframe::App for InkkApp {
                         } else if let Some(idx) = edit_grid_idx {
                             let grid = self.notebook.current_page().grids[idx].clone();
                             self.table_dialog.open_edit(&grid);
-                        } else if let Some(idx) = edit_flow_idx {
-                            let flow = self.notebook.current_page().flowcharts[idx].clone();
-                            self.flowchart_editor.open_for_entity(&flow);
                         } else if let Some(idx) = delete_plot_idx {
                             self.notebook.current_page_mut().plots.remove(idx);
                             self.clear_selection();
@@ -4299,19 +4274,27 @@ impl eframe::App for InkkApp {
                             self.notebook.current_page_mut().grids.remove(idx);
                             self.clear_selection();
                             self.set_status("Deleted table");
-                        } else if let Some(idx) = delete_flow_idx {
-                            self.notebook.current_page_mut().flowcharts.remove(idx);
-                            self.clear_selection();
-                            self.set_status("Deleted flowchart");
                         } else if let Some((port_node, port_side)) = self.flowchart_state.hovered_port {
                             // User clicked an anchor connection dot!
                             self.flowchart_state.active_port_menu = Some((port_node, port_side, cursor));
                             self.flowchart_state.selected_node_id = Some(port_node);
                             self.canvas_gesture = false;
                         } else if let Some(hit_node) = self.flowchart_state.hovered_node_id {
-                            // User clicked on a flowchart node body!
-                            self.flowchart_state.selected_node_id = Some(hit_node);
-                            self.flowchart_state.dragging_node = Some((hit_node, world));
+                            // User clicked on a flowchart node body directly on the whiteboard
+                            let is_double_click = ui.input(|i| i.pointer.button_double_clicked(egui::PointerButton::Primary));
+                            if is_double_click {
+                                self.flowchart_state.editing_node_id = Some(hit_node);
+                                for flow in &self.notebook.current_page().flowcharts {
+                                    if let Some(g) = &flow.graph {
+                                        if let Some(n) = g.node(hit_node) {
+                                            self.flowchart_state.edit_label_buffer = n.label.clone();
+                                        }
+                                    }
+                                }
+                            } else {
+                                self.flowchart_state.selected_node_id = Some(hit_node);
+                                self.flowchart_state.dragging_node = Some((hit_node, world));
+                            }
                             self.flowchart_state.active_port_menu = None;
                             self.canvas_gesture = false;
                         } else {
@@ -4910,10 +4893,8 @@ impl eframe::App for InkkApp {
                                     }
                                     "flowchart" => {
                                         self.selected_flowchart_ids.insert(id.clone());
-                                        if let Some(flow) = self.notebook.current_page().flowcharts.iter().find(|f| f.id == id) {
-                                            self.flowchart_editor.open_for_entity(flow);
-                                        }
-                                        self.set_status("Selected 1 flowchart (editing in Flowchart Studio)");
+                                        self.flowchart_state.active_flowchart_id = Some(id);
+                                        self.set_status("Selected flowchart on whiteboard");
                                     }
                                     "image" => {
                                         self.selected_image_ids.insert(id);
@@ -5029,8 +5010,11 @@ impl eframe::App for InkkApp {
                     self.set_status("Deleted flowchart block");
                 }
 
-                // 3. Flowchart "Add Next Block" Quick Picker Popover
-                if self.flowchart_state.active_port_menu.is_some() {
+                // 3. Flowchart Interactive Actions & Quick Picker Popover
+                if self.flowchart_state.active_port_menu.is_some()
+                    || self.flowchart_state.applied_label_change.is_some()
+                    || self.flowchart_state.req_delete_node_id.is_some()
+                {
                     let page_mut = self.notebook.current_page_mut();
                     let active_fid = self.flowchart_state.active_flowchart_id.clone();
                     if let Some(fid) = active_fid {
@@ -5410,8 +5394,8 @@ impl eframe::App for InkkApp {
                     self.set_status("Math Studio OPEN");
                 }
                 crate::splash_screen::SplashAction::OpenFlowchart => {
-                    self.flowchart_editor.is_open = true;
-                    self.set_status("Flowchart Studio OPEN");
+                    self.flowchart_state.is_panel_open = true;
+                    self.set_status("Flowchart Shapes Menu OPEN");
                 }
                 crate::splash_screen::SplashAction::OpenRecent(path) => {
                     if let Err(e) = self.open_notebook_from_path(&path) {

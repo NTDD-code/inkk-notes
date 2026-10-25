@@ -31,88 +31,7 @@ impl FlowchartRenderer {
         is_selected: bool,
         pointer_pos: Option<Pos2>,
     ) -> Option<Rect> {
-        let card_min = to_screen(Pos2::new(entity.x, entity.y));
-        let card_size = Vec2::new(entity.width * scale, entity.height * scale);
-        let card_rect = Rect::from_min_size(card_min, card_size);
-
-        // 1. Draw Card Background Frame
-        let bg_color = if is_dark {
-            Color32::from_rgba_unmultiplied(31, 28, 25, 235)
-        } else {
-            Color32::from_rgba_unmultiplied(253, 252, 250, 245)
-        };
-
-        if is_selected {
-            let shadow_rect = card_rect.translate(Vec2::new(0.0, 4.0 * scale));
-            painter.rect_filled(shadow_rect, 10.0, palette.accent_soft);
-        }
-
-        painter.rect_filled(card_rect, 8.0, bg_color);
-        let border_stroke = if is_selected {
-            Stroke::new(2.0_f32, palette.accent)
-        } else {
-            Stroke::new(1.0_f32, palette.border)
-        };
-        painter.rect_stroke(card_rect, 8.0, border_stroke);
-
-        // 2. Flowchart Header
-        let header_h = (28.0 * scale).clamp(24.0, 36.0);
-        let header_rect =
-            Rect::from_min_size(card_rect.min, Vec2::new(card_rect.width(), header_h));
-        let header_bg = if is_dark {
-            Color32::from_rgba_unmultiplied(41, 38, 34, 200)
-        } else {
-            Color32::from_rgba_unmultiplied(240, 235, 226, 220)
-        };
-        painter.rect_filled(header_rect, 8.0, header_bg);
-
-        // Header Vector Icon
-        let icon_box = Rect::from_min_size(
-            header_rect.left_center() + Vec2::new(8.0 * scale, -9.0 * scale),
-            Vec2::splat(18.0 * scale),
-        );
-        VectorIcon::Flowchart.paint(painter, icon_box, palette.accent, 1.8);
-
-        // Title text
-        let title_text = if !entity.title.is_empty() {
-            entity.title.clone()
-        } else {
-            "Flowchart".to_string()
-        };
-        painter.text(
-            header_rect.left_center() + Vec2::new(32.0 * scale, 0.0),
-            egui::Align2::LEFT_CENTER,
-            &title_text,
-            egui::FontId::proportional((12.0 * scale).clamp(10.0, 14.0)),
-            palette.text,
-        );
-
-        // Edit Code Pill Button
-        let edit_btn_w = 46.0 * scale;
-        let edit_btn_rect = Rect::from_min_size(
-            header_rect.right_center() + Vec2::new(-edit_btn_w - 32.0 * scale, -9.0 * scale),
-            Vec2::new(edit_btn_w, 18.0 * scale),
-        );
-        painter.rect_filled(edit_btn_rect, 4.0, palette.accent_soft);
-        painter.text(
-            edit_btn_rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "Edit",
-            egui::FontId::proportional((10.0 * scale).max(9.0)),
-            palette.accent,
-        );
-
-        // Close 'x' Button
-        let close_center = header_rect.right_center() + Vec2::new(-14.0 * scale, 0.0);
-        painter.text(
-            close_center,
-            egui::Align2::CENTER_CENTER,
-            "x",
-            egui::FontId::proportional((14.0 * scale).clamp(12.0, 16.0)),
-            palette.text_muted,
-        );
-
-        // 3. Obtain Flowchart Graph
+        // 1. Obtain Flowchart Graph
         let graph = if let Some(g) = &entity.graph {
             g.clone()
         } else {
@@ -121,17 +40,25 @@ impl FlowchartRenderer {
         };
 
         if graph.nodes.is_empty() {
-            painter.text(
-                card_rect.center() + Vec2::new(0.0, header_h * 0.5),
-                egui::Align2::CENTER_CENTER,
-                "Select shapes from left panel to build flowchart",
-                egui::FontId::proportional((13.0 * scale).clamp(11.0, 15.0)),
-                palette.text_muted,
-            );
-            return Some(card_rect);
+            return None;
         }
 
-        // 4. Compute layout for any unpinned nodes
+        // 2. Compute visual bounds directly on the whiteboard canvas
+        let (min_x, min_y, max_x, max_y) = graph.compute_bounds();
+        let flow_screen_min = to_screen(Pos2::new(entity.x + min_x - 16.0, entity.y + min_y - 16.0));
+        let flow_screen_max = to_screen(Pos2::new(entity.x + max_x + 16.0, entity.y + max_y + 16.0));
+        let flow_rect = Rect::from_min_max(flow_screen_min, flow_screen_max);
+
+        // Group selection outline (if entire flowchart is selected via lasso)
+        if is_selected {
+            painter.rect_stroke(
+                flow_rect,
+                4.0,
+                Stroke::new(1.2 * scale, palette.accent_soft),
+            );
+        }
+
+        // 3. Compute layout for any unpinned nodes
         let layout_engine = LayoutEngine::new();
         let layout = layout_engine.compute_layout(&graph);
 
@@ -338,11 +265,69 @@ impl FlowchartRenderer {
                             painter.circle_stroke(dot_pos, dot_normal_r, Stroke::new(1.2_f32, Color32::WHITE));
                         }
                     }
+                    // 8. Inline Rename / Delete Toolbar when Node is Selected
+                    if is_sel && state.editing_node_id.is_none() {
+                        let toolbar_pos = Pos2::new(node_rect.center().x - 45.0, node_rect.top() - 22.0 * scale);
+                        let area_id = egui::Id::new("node_selected_toolbar").with(node.id);
+                        egui::Area::new(area_id)
+                            .fixed_pos(toolbar_pos)
+                            .order(egui::Order::Foreground)
+                            .show(ui.ctx(), |ui| {
+                                egui::Frame::menu(ui.style())
+                                    .rounding(Rounding::same(4.0))
+                                    .fill(if is_dark {
+                                        Color32::from_rgb(45, 42, 38)
+                                    } else {
+                                        Color32::from_rgb(250, 248, 244)
+                                    })
+                                    .stroke(Stroke::new(1.0_f32, palette.border))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.spacing_mut().item_spacing = Vec2::new(3.0, 0.0);
+                                            if ui.small_button("Rename").clicked() {
+                                                state.editing_node_id = Some(node.id);
+                                                state.edit_label_buffer = node.label.clone();
+                                            }
+                                            if ui.small_button("Delete").clicked() {
+                                                state.req_delete_node_id = Some(node.id);
+                                            }
+                                        });
+                                    });
+                            });
+                    }
+
+                    // 9. Inline Text Editor for Node Label
+                    if state.editing_node_id == Some(node.id) {
+                        let edit_rect = Rect::from_center_size(
+                            node_rect.center(),
+                            Vec2::new(node_rect.width() - 14.0, 22.0 * scale.clamp(0.8, 1.4)),
+                        );
+                        let area_id = egui::Id::new("node_label_edit_area").with(node.id);
+                        egui::Area::new(area_id)
+                            .fixed_pos(edit_rect.min)
+                            .order(egui::Order::Foreground)
+                            .show(ui.ctx(), |ui| {
+                                let mut text = state.edit_label_buffer.clone();
+                                let font = egui::FontId::proportional((11.0 * scale).clamp(10.0, 14.0));
+                                let resp = ui.add(
+                                    egui::TextEdit::singleline(&mut text)
+                                        .desired_width(edit_rect.width())
+                                        .font(font)
+                                        .horizontal_align(egui::Align::Center),
+                                );
+                                resp.request_focus();
+                                state.edit_label_buffer = text;
+                                if resp.lost_focus() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                    state.applied_label_change = Some((node.id, state.edit_label_buffer.clone()));
+                                    state.editing_node_id = None;
+                                }
+                            });
+                    }
                 }
             }
         }
 
-        Some(card_rect)
+        Some(flow_rect)
     }
 
     /// Handle interactive Quick Picker Popover and node creation.
@@ -353,6 +338,25 @@ impl FlowchartRenderer {
         palette: &Palette,
         is_dark: bool,
     ) {
+        // Apply inline label edits
+        if let Some((nid, new_label)) = state.applied_label_change.take() {
+            if let Some(graph) = entity.graph.as_mut() {
+                if let Some(node) = graph.node_mut(nid) {
+                    node.label = new_label;
+                }
+            }
+        }
+
+        // Apply node deletion
+        if let Some(del_id) = state.req_delete_node_id.take() {
+            if let Some(graph) = entity.graph.as_mut() {
+                graph.remove_node(del_id);
+            }
+            if state.selected_node_id == Some(del_id) {
+                state.selected_node_id = None;
+            }
+        }
+
         if let Some((source_id, source_side, dot_screen_pos)) = state.active_port_menu {
             let mut choice: Option<BlockKind> = None;
             let mut close_menu = false;
@@ -397,12 +401,12 @@ impl FlowchartRenderer {
                             ui.separator();
 
                             let choices = [
-                                (BlockKind::Process, VectorIcon::ShapeRectangle, "Process (Xử lý)"),
-                                (BlockKind::Decision, VectorIcon::ShapeDiamond, "Decision (Điều kiện)"),
-                                (BlockKind::Start, VectorIcon::ShapeOval, "Terminator (Đầu / Cuối)"),
-                                (BlockKind::Input, VectorIcon::ShapeParallelogram, "Data I/O (Nhập / Xuất)"),
-                                (BlockKind::Connector, VectorIcon::ShapeCircle, "Connector (Điểm nối)"),
-                                (BlockKind::Subroutine, VectorIcon::ShapeSubroutine, "Subroutine (Khối con)"),
+                                (BlockKind::Process, VectorIcon::ShapeRectangle, "Process"),
+                                (BlockKind::Decision, VectorIcon::ShapeDiamond, "Decision"),
+                                (BlockKind::Start, VectorIcon::ShapeOval, "Terminator"),
+                                (BlockKind::Input, VectorIcon::ShapeParallelogram, "Data I/O"),
+                                (BlockKind::Connector, VectorIcon::ShapeCircle, "Connector"),
+                                (BlockKind::Subroutine, VectorIcon::ShapeSubroutine, "Subroutine"),
                             ];
 
                             for (k, icon, title) in choices {
