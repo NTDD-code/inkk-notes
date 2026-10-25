@@ -2308,27 +2308,29 @@ impl InkkApp {
                             }
 
                             let painter = ui.painter_at(rect.expand(4.0));
-                            let to_thumb = |pt: Pos2| rect.min + pt.to_vec2() * thumb_scale;
-                            let page_rect = Rect::from_min_size(
-                                rect.min,
-                                Vec2::new(page.width, page.height) * thumb_scale,
-                            );
-                            NoteRenderer::render_background(
-                                &painter.with_clip_rect(rect),
-                                page_rect,
-                                page.paper_type,
-                                page.width,
-                                page.height,
-                                thumb_scale,
-                                &to_thumb,
-                                is_dark,
-                            );
-                            NoteRenderer::render_strokes(
-                                &painter.with_clip_rect(rect),
-                                &page.strokes,
-                                thumb_scale,
-                                &to_thumb,
-                            );
+                            if ui.is_rect_visible(rect) {
+                                let to_thumb = |pt: Pos2| rect.min + pt.to_vec2() * thumb_scale;
+                                let page_rect = Rect::from_min_size(
+                                    rect.min,
+                                    Vec2::new(page.width, page.height) * thumb_scale,
+                                );
+                                NoteRenderer::render_background(
+                                    &painter.with_clip_rect(rect),
+                                    page_rect,
+                                    page.paper_type,
+                                    page.width,
+                                    page.height,
+                                    thumb_scale,
+                                    &to_thumb,
+                                    is_dark,
+                                );
+                                NoteRenderer::render_strokes_thumbnail(
+                                    &painter.with_clip_rect(rect),
+                                    &page.strokes,
+                                    thumb_scale,
+                                    &to_thumb,
+                                );
+                            }
 
                             let ring = if is_active {
                                 Stroke::new(2.0_f32, p.accent)
@@ -3440,18 +3442,10 @@ impl eframe::App for InkkApp {
             }
         }
 
-        // Track stroke changes to ensure dirty state is maintained
-        let cur_strokes: usize = self.notebook.pages.iter().map(|p| p.strokes.len()).sum();
-        if cur_strokes != self.last_total_strokes {
-            self.autosave.mark_dirty();
-            self.last_total_strokes = cur_strokes;
-        }
-
-        // Periodic background autosave check
-        if self.autosave.should_autosave() {
-            if let Err(e) = self.autosave.save_recovery(&self.notebook, self.current_file_path.as_deref()) {
-                eprintln!("Autosave snapshot failed: {}", e);
-            }
+        // Periodic background autosave check (non-blocking thread)
+        // Never trigger autosave while the user is actively drawing a stroke with pen-down!
+        if self.current_stroke.is_none() && self.autosave.should_autosave() {
+            self.autosave.trigger_autosave_background(&self.notebook, self.current_file_path.as_deref());
         }
 
         // Keep wake-up timer active if dirty and autosave is enabled
@@ -3763,8 +3757,17 @@ impl eframe::App for InkkApp {
                     );
                 }
 
+                // Viewport Frustum Culling bounds in world coordinates
+                let view_world_min = self.to_world(canvas_rect.min);
+                let view_world_max = self.to_world(canvas_rect.max);
+                let view_world_rect = Rect::from_min_max(view_world_min, view_world_max).expand(40.0 / scale);
+
                 // Layer 0: Image Layer (Scrble Ink PictureLayer)
                 for img in &page.images {
+                    let img_rect_world = Rect::from_min_size(Pos2::new(img.x, img.y), Vec2::new(img.width, img.height));
+                    if !view_world_rect.intersects(img_rect_world) {
+                        continue;
+                    }
                     let tex_handle = self.image_textures.entry(img.id.clone()).or_insert_with(|| {
                         let color_img = match image::load_from_memory(&img.data) {
                             Ok(dyn_img) => {
@@ -3792,16 +3795,28 @@ impl eframe::App for InkkApp {
 
                 // Layer 0.1: Table Grids
                 for grid in &page.grids {
+                    let grid_rect_world = Rect::from_min_size(Pos2::new(grid.x, grid.y), Vec2::new(grid.total_width(), grid.total_height()));
+                    if !view_world_rect.intersects(grid_rect_world) {
+                        continue;
+                    }
                     MathRenderer::render_table_grid(&page_painter, grid, scale, &to_screen, &p, is_dark);
                 }
 
                 // Layer 0.2: 2D Plots & Mathematical Graphs
                 for plot in &page.plots {
+                    let plot_rect_world = Rect::from_min_size(Pos2::new(plot.x, plot.y), Vec2::new(plot.width, plot.height));
+                    if !view_world_rect.intersects(plot_rect_world) {
+                        continue;
+                    }
                     MathRenderer::render_plot(&page_painter, plot, scale, &to_screen, &p, is_dark);
                 }
 
                 // Layer 0.3: Matrix Entities
                 for matrix in &page.matrices {
+                    let mat_rect_world = Rect::from_min_size(Pos2::new(matrix.x, matrix.y), Vec2::new(matrix.width, matrix.height));
+                    if !view_world_rect.intersects(mat_rect_world) {
+                        continue;
+                    }
                     MathRenderer::render_matrix(&page_painter, matrix, scale, &to_screen, &p, is_dark);
                 }
 
@@ -3827,6 +3842,12 @@ impl eframe::App for InkkApp {
                 // Layer 1: Highlighters (saved)
                 for stroke in &page.strokes {
                     if stroke.pen_type == PenType::Highlighter {
+                        if let Some((min_x, min_y, max_x, max_y)) = stroke.bounds() {
+                            let stroke_rect = Rect::from_min_max(Pos2::new(min_x, min_y), Pos2::new(max_x, max_y)).expand(stroke.size * 2.0);
+                            if !view_world_rect.intersects(stroke_rect) {
+                                continue;
+                            }
+                        }
                         NoteRenderer::render_single_stroke(&page_painter, stroke, scale, &to_screen);
                     }
                 }
@@ -3840,6 +3861,12 @@ impl eframe::App for InkkApp {
                 // Layer 2: Normal ink strokes (ballpoint, calligraphy, pencil)
                 for stroke in &page.strokes {
                     if stroke.pen_type != PenType::Highlighter {
+                        if let Some((min_x, min_y, max_x, max_y)) = stroke.bounds() {
+                            let stroke_rect = Rect::from_min_max(Pos2::new(min_x, min_y), Pos2::new(max_x, max_y)).expand(stroke.size * 2.0);
+                            if !view_world_rect.intersects(stroke_rect) {
+                                continue;
+                            }
+                        }
                         NoteRenderer::render_single_stroke(&page_painter, stroke, scale, &to_screen);
                     }
                 }
@@ -3856,6 +3883,10 @@ impl eframe::App for InkkApp {
                         continue;
                     }
                     if tb.text.trim().is_empty() {
+                        continue;
+                    }
+                    let tb_rect_world = Rect::from_min_size(Pos2::new(tb.x, tb.y), Vec2::new(tb.width, tb.height));
+                    if !view_world_rect.intersects(tb_rect_world) {
                         continue;
                     }
 

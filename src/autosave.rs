@@ -6,6 +6,8 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use eframe::egui::{self, Color32, Rounding, Stroke, Vec2};
@@ -90,6 +92,8 @@ pub struct AutosaveManager {
     pub show_settings_dialog: bool,
     /// Active recovery notice banner if restored after an unexpected exit.
     pub recovery_restored_banner: Option<RecoveryMetadata>,
+    /// Thread-safe flag indicating a background autosave worker is active.
+    pub is_saving: Arc<AtomicBool>,
 }
 
 impl Default for AutosaveManager {
@@ -111,6 +115,7 @@ impl AutosaveManager {
             autosave_dir,
             show_settings_dialog: false,
             recovery_restored_banner: None,
+            is_saving: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -257,7 +262,61 @@ impl AutosaveManager {
     pub fn should_autosave(&self) -> bool {
         self.enabled
             && self.is_dirty
+            && !self.is_saving.load(Ordering::Relaxed)
             && self.last_autosave_time.elapsed().as_secs() >= self.interval.as_secs()
+    }
+
+    /// Asynchronously save recovery snapshot in a background thread to prevent UI stutter.
+    pub fn trigger_autosave_background(
+        &mut self,
+        notebook: &Notebook,
+        original_path: Option<&Path>,
+    ) {
+        if self.is_saving.load(Ordering::Relaxed) {
+            return;
+        }
+
+        self.is_saving.store(true, Ordering::Relaxed);
+        let is_saving_flag = self.is_saving.clone();
+        let autosave_dir = self.autosave_dir.clone();
+        let handnote_path = self.recovery_notebook_path();
+        let meta_path = self.recovery_meta_path();
+        let notebook_clone = notebook.clone();
+        let original_path_buf = original_path.map(|p| p.to_path_buf());
+        let time_str = Self::current_time_str();
+
+        self.last_autosave_time = Instant::now();
+        self.last_autosave_str = Some(time_str.clone());
+        self.is_dirty = false;
+
+        std::thread::spawn(move || {
+            let _ = fs::create_dir_all(&autosave_dir);
+            // 1. Write compressed notebook snapshot
+            let _ = NotebookStorage::save(&handnote_path, &notebook_clone);
+
+            // 2. Write metadata
+            let total_strokes: usize = notebook_clone.pages.iter().map(|p| p.strokes.len()).sum();
+            let unix_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+
+            let meta = RecoveryMetadata {
+                timestamp_unix: unix_time,
+                time_str,
+                notebook_title: notebook_clone.title.clone(),
+                original_file_path: original_path_buf,
+                page_count: notebook_clone.pages.len(),
+                stroke_count: total_strokes,
+                is_clean_exit: false,
+            };
+
+            if let Ok(meta_json) = serde_json::to_string_pretty(&meta) {
+                let _ = fs::write(&meta_path, meta_json);
+            }
+
+            is_saving_flag.store(false, Ordering::Relaxed);
+        });
     }
 
     /// Discard and delete the recovery snapshot files.

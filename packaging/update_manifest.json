@@ -2,8 +2,8 @@
     "version":  "0.1.2",
     "release_date":  "2026-10-25",
     "title":  "Inkk 0.1.2",
-    "release_notes":  "What's new in Inkk v0.1.2:\n- Whiteboard-native Flowcharting: Flowchart shapes and directional connecting arrows lie directly on the whiteboard canvas with zero popup windows\n- Interactive Anchor Connection Dots: Hover connection dots appear on block edges; clicking an anchor opens quick-picker to auto-connect the next block with an arrow\n- In-place Node Editing: Double-click or use inline controls directly on the canvas to edit shape labels\n- Precision Lasso Selection: Enclosure ratio and centroid filtering to accurately select individual strokes without grabbing nearby strokes or background cards\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window\n- Auto-update alert: Automatically displays update modal when a newer version is available\n- Splash screen version indicator: Displays current version dynamically",
+    "release_notes":  "What's new in Inkk v0.1.2:\n- Performance & Zero-Stutter Writing: Non-blocking background autosave eliminates pen freeze, viewport frustum culling accelerates multi-page notebooks\n- Lightweight Previews Drawer: Culls off-screen thumbnails and renders fast vector polylines for instant scrolling\n- Whiteboard-native Flowcharting: Shapes and connecting arrows lie directly on the canvas without popup windows\n- Interactive Anchor Connection Dots: Hover connection dots appear on block edges; clicking an anchor opens quick-picker to auto-connect with an arrow\n- Precision Lasso Selection: Enclosure ratio and centroid filtering to accurately select individual strokes\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window",
     "download_url":  "https://github.com/NTDD-code/inkk-notes/releases/latest",
     "mandatory":  false,
-    "sha256":  "A09974E2AAB44F58377FEBAE6688065F0BC9298F7073BDFC9D218E6A02D12816"
+    "sha256":  "D17C1C5A301B6ACF85EFA4642D1C1322C6D9F40E52489B96E278ABD8E8808151"
 }

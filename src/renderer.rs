@@ -319,6 +319,7 @@ impl NoteRenderer {
         smooth
     }
 
+    #[allow(dead_code)]
     pub fn render_strokes<F>(painter: &Painter, strokes: &[NoteStroke], scale: f32, to_screen: &F)
     where
         F: Fn(Pos2) -> Pos2,
@@ -334,6 +335,53 @@ impl NoteRenderer {
             if stroke.pen_type != PenType::Highlighter {
                 Self::render_single_stroke(painter, stroke, scale, to_screen);
             }
+        }
+    }
+
+    /// Optimized lightweight stroke renderer for page previews and thumbnails.
+    /// Draws clean simplified vector lines without expensive multi-pass Bezier ribbon meshing.
+    pub fn render_strokes_thumbnail<F>(
+        painter: &Painter,
+        strokes: &[NoteStroke],
+        scale: f32,
+        to_screen: &F,
+    ) where
+        F: Fn(Pos2) -> Pos2,
+    {
+        for stroke in strokes {
+            if stroke.points.len() < 2 {
+                if let Some(p) = stroke.points.first() {
+                    let sp = to_screen(Pos2::new(p.x, p.y));
+                    let r = (stroke.size * scale * 0.5).clamp(1.0, 3.0);
+                    let color = Color32::from_rgba_unmultiplied(
+                        stroke.color[0],
+                        stroke.color[1],
+                        stroke.color[2],
+                        (stroke.opacity * 255.0) as u8,
+                    );
+                    painter.circle_filled(sp, r, color);
+                }
+                continue;
+            }
+
+            let pts: Vec<Pos2> = stroke.points.iter().map(|p| to_screen(Pos2::new(p.x, p.y))).collect();
+            let base_w = (stroke.size * scale).clamp(1.0, 4.0);
+            let color = if stroke.pen_type == PenType::Highlighter {
+                Color32::from_rgba_unmultiplied(
+                    stroke.color[0],
+                    stroke.color[1],
+                    stroke.color[2],
+                    ((stroke.opacity * 255.0) as f32 * 0.4) as u8,
+                )
+            } else {
+                Color32::from_rgba_unmultiplied(
+                    stroke.color[0],
+                    stroke.color[1],
+                    stroke.color[2],
+                    (stroke.opacity * 255.0) as u8,
+                )
+            };
+            painter.add(egui::Shape::line(pts, Stroke::new(base_w, color)));
         }
     }
 
