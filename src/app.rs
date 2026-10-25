@@ -3869,9 +3869,6 @@ impl eframe::App for InkkApp {
                 let accent = p.accent;
                 if self.tool == ToolMode::LassoSelect && self.lasso_points.len() >= 2 {
                     let screen_pts: Vec<Pos2> = self.lasso_points.iter().map(|pt| self.to_screen(*pt)).collect();
-                    if screen_pts.len() >= 3 {
-                        painter.add(egui::Shape::convex_polygon(screen_pts.clone(), p.accent_soft, Stroke::NONE));
-                    }
                     let mut closed = screen_pts;
                     closed.push(closed[0]);
                     painter.add(egui::Shape::dashed_line(&closed, Stroke::new(1.5_f32, accent), 6.0, 4.0));
@@ -4281,40 +4278,14 @@ impl eframe::App for InkkApp {
                                         self.is_dragging_selection = true;
                                         self.drag_last_pos_world = world;
                                         self.prepare_selection_drag();
-                                    } else if let Some((kind, id)) = self.hit_test_clickable_card(world) {
-                                        self.clear_selection();
-                                        match kind {
-                                            "plot" => { self.selected_plot_ids.insert(id); }
-                                            "matrix" => { self.selected_matrix_ids.insert(id); }
-                                            "grid" => { self.selected_grid_ids.insert(id); }
-                                            "flowchart" => { self.selected_flowchart_ids.insert(id); }
-                                            "image" => { self.selected_image_ids.insert(id); }
-                                            _ => {}
-                                        }
-                                        self.active_resize_handle = None;
-                                        self.is_dragging_selection = true;
-                                        self.drag_last_pos_world = world;
-                                        self.prepare_selection_drag();
                                     } else {
+                                        // Clicked outside existing selection: start a fresh lasso gesture!
                                         self.clear_selection();
                                         self.is_dragging_selection = false;
                                         self.lasso_points = vec![world];
                                     }
-                                } else if let Some((kind, id)) = self.hit_test_clickable_card(world) {
-                                    self.clear_selection();
-                                    match kind {
-                                        "plot" => { self.selected_plot_ids.insert(id); }
-                                        "matrix" => { self.selected_matrix_ids.insert(id); }
-                                        "grid" => { self.selected_grid_ids.insert(id); }
-                                        "flowchart" => { self.selected_flowchart_ids.insert(id); }
-                                        "image" => { self.selected_image_ids.insert(id); }
-                                        _ => {}
-                                    }
-                                    self.active_resize_handle = None;
-                                    self.is_dragging_selection = true;
-                                    self.drag_last_pos_world = world;
-                                    self.prepare_selection_drag();
                                 } else {
+                                    // No current selection: start a fresh lasso gesture!
                                     self.clear_selection();
                                     self.is_dragging_selection = false;
                                     self.lasso_points = vec![world];
@@ -4706,7 +4677,24 @@ impl eframe::App for InkkApp {
                     if self.is_dragging_selection {
                         self.finish_selection_drag();
                     } else if !self.lasso_points.is_empty() {
-                        if self.lasso_points.len() >= 3 {
+                        // Compute bounding box and diagonal span of the lasso gesture
+                        let mut l_min_x = f32::MAX;
+                        let mut l_min_y = f32::MAX;
+                        let mut l_max_x = f32::MIN;
+                        let mut l_max_y = f32::MIN;
+                        for pt in &self.lasso_points {
+                            l_min_x = l_min_x.min(pt.x);
+                            l_max_x = l_max_x.max(pt.x);
+                            l_min_y = l_min_y.min(pt.y);
+                            l_max_y = l_max_y.max(pt.y);
+                        }
+                        let lasso_bbox = Rect::from_min_max(Pos2::new(l_min_x, l_min_y), Pos2::new(l_max_x, l_max_y));
+                        let gesture_diag = (lasso_bbox.width() * lasso_bbox.width() + lasso_bbox.height() * lasso_bbox.height()).sqrt();
+
+                        // Treat as a real lasso loop only if it has >= 3 points and a movement span >= 10 world units
+                        let is_lasso_loop = self.lasso_points.len() >= 3 && gesture_diag >= (10.0 / self.scale).max(6.0);
+
+                        if is_lasso_loop {
                             let mut selected_strokes = HashSet::new();
                             let mut selected_images = HashSet::new();
                             let mut selected_plots = HashSet::new();
@@ -4714,63 +4702,107 @@ impl eframe::App for InkkApp {
                             let mut selected_grids = HashSet::new();
                             let mut selected_flowcharts = HashSet::new();
                             let page = self.notebook.current_page();
+
+                            // 1. Precise Stroke Enclosure Algorithm (enclosed majority + centroid)
                             for stroke in &page.strokes {
-                                if stroke.points.iter().any(|pt| point_in_polygon(Pos2::new(pt.x, pt.y), &self.lasso_points)) {
+                                if stroke.points.is_empty() {
+                                    continue;
+                                }
+                                let mut s_min_x = f32::MAX;
+                                let mut s_min_y = f32::MAX;
+                                let mut s_max_x = f32::MIN;
+                                let mut s_max_y = f32::MIN;
+                                let mut sum_x = 0.0f32;
+                                let mut sum_y = 0.0f32;
+                                for pt in &stroke.points {
+                                    s_min_x = s_min_x.min(pt.x);
+                                    s_max_x = s_max_x.max(pt.x);
+                                    s_min_y = s_min_y.min(pt.y);
+                                    s_max_y = s_max_y.max(pt.y);
+                                    sum_x += pt.x;
+                                    sum_y += pt.y;
+                                }
+                                let s_bbox = Rect::from_min_max(Pos2::new(s_min_x, s_min_y), Pos2::new(s_max_x, s_max_y));
+                                if !lasso_bbox.intersects(s_bbox) {
+                                    continue;
+                                }
+
+                                let n_pts = stroke.points.len();
+                                let centroid = Pos2::new(sum_x / n_pts as f32, sum_y / n_pts as f32);
+
+                                let pts_inside = stroke
+                                    .points
+                                    .iter()
+                                    .filter(|pt| point_in_polygon(Pos2::new(pt.x, pt.y), &self.lasso_points))
+                                    .count();
+
+                                let is_selected = if n_pts <= 4 {
+                                    // For small dots, punctuation, diacritics: centroid inside or >= 50% points inside
+                                    pts_inside >= (n_pts + 1) / 2 || point_in_polygon(centroid, &self.lasso_points)
+                                } else {
+                                    let ratio = pts_inside as f32 / n_pts as f32;
+                                    if ratio >= 0.55 {
+                                        true
+                                    } else if ratio >= 0.40 && point_in_polygon(centroid, &self.lasso_points) {
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                };
+
+                                if is_selected {
                                     selected_strokes.insert(stroke.id.clone());
                                 }
                             }
+
+                            // 2. Precise Card Enclosure Algorithm (prevents accidental card selection when circling nearby/inside notes)
+                            let card_encircled = |card_rect: Rect, lasso: &[Pos2], l_bbox: Rect| -> bool {
+                                if card_rect.width() > l_bbox.width() * 1.25 || card_rect.height() > l_bbox.height() * 1.25 {
+                                    return false;
+                                }
+                                let tl = card_rect.left_top();
+                                let tr = card_rect.right_top();
+                                let bl = card_rect.left_bottom();
+                                let br = card_rect.right_bottom();
+                                let center = card_rect.center();
+                                let corners = [tl, tr, bl, br];
+                                let corners_inside = corners.iter().filter(|c| point_in_polygon(**c, lasso)).count();
+                                if corners_inside == 4 {
+                                    true
+                                } else if corners_inside >= 3 && point_in_polygon(center, lasso) {
+                                    true
+                                } else {
+                                    false
+                                }
+                            };
+
                             for img in &page.images {
-                                let center = Pos2::new(img.x + img.width * 0.5, img.y + img.height * 0.5);
-                                let tl = Pos2::new(img.x, img.y);
-                                let br = Pos2::new(img.x + img.width, img.y + img.height);
-                                if point_in_polygon(center, &self.lasso_points)
-                                    || point_in_polygon(tl, &self.lasso_points)
-                                    || point_in_polygon(br, &self.lasso_points)
-                                {
+                                let rect = Rect::from_min_size(Pos2::new(img.x, img.y), Vec2::new(img.width, img.height));
+                                if card_encircled(rect, &self.lasso_points, lasso_bbox) {
                                     selected_images.insert(img.id.clone());
                                 }
                             }
                             for plot in &page.plots {
-                                let center = Pos2::new(plot.x + plot.width * 0.5, plot.y + plot.height * 0.5);
-                                let tl = Pos2::new(plot.x, plot.y);
-                                let br = Pos2::new(plot.x + plot.width, plot.y + plot.height);
-                                if point_in_polygon(center, &self.lasso_points)
-                                    || point_in_polygon(tl, &self.lasso_points)
-                                    || point_in_polygon(br, &self.lasso_points)
-                                {
+                                let rect = Rect::from_min_size(Pos2::new(plot.x, plot.y), Vec2::new(plot.width, plot.height));
+                                if card_encircled(rect, &self.lasso_points, lasso_bbox) {
                                     selected_plots.insert(plot.id.clone());
                                 }
                             }
                             for m in &page.matrices {
-                                let center = Pos2::new(m.x + m.width * 0.5, m.y + m.height * 0.5);
-                                let tl = Pos2::new(m.x, m.y);
-                                let br = Pos2::new(m.x + m.width, m.y + m.height);
-                                if point_in_polygon(center, &self.lasso_points)
-                                    || point_in_polygon(tl, &self.lasso_points)
-                                    || point_in_polygon(br, &self.lasso_points)
-                                {
+                                let rect = Rect::from_min_size(Pos2::new(m.x, m.y), Vec2::new(m.width, m.height));
+                                if card_encircled(rect, &self.lasso_points, lasso_bbox) {
                                     selected_matrices.insert(m.id.clone());
                                 }
                             }
                             for g in &page.grids {
-                                let center = Pos2::new(g.x + g.total_width() * 0.5, g.y + g.total_height() * 0.5);
-                                let tl = Pos2::new(g.x, g.y);
-                                let br = Pos2::new(g.x + g.total_width(), g.y + g.total_height());
-                                if point_in_polygon(center, &self.lasso_points)
-                                    || point_in_polygon(tl, &self.lasso_points)
-                                    || point_in_polygon(br, &self.lasso_points)
-                                {
+                                let rect = Rect::from_min_size(Pos2::new(g.x, g.y), Vec2::new(g.total_width(), g.total_height()));
+                                if card_encircled(rect, &self.lasso_points, lasso_bbox) {
                                     selected_grids.insert(g.id.clone());
                                 }
                             }
                             for f in &page.flowcharts {
-                                let center = Pos2::new(f.x + f.width * 0.5, f.y + f.height * 0.5);
-                                let tl = Pos2::new(f.x, f.y);
-                                let br = Pos2::new(f.x + f.width, f.y + f.height);
-                                if point_in_polygon(center, &self.lasso_points)
-                                    || point_in_polygon(tl, &self.lasso_points)
-                                    || point_in_polygon(br, &self.lasso_points)
-                                {
+                                let rect = Rect::from_min_size(Pos2::new(f.x, f.y), Vec2::new(f.width, f.height));
+                                if card_encircled(rect, &self.lasso_points, lasso_bbox) {
                                     selected_flowcharts.insert(f.id.clone());
                                 }
                             }
@@ -4783,6 +4815,8 @@ impl eframe::App for InkkApp {
                             self.selected_flowchart_ids = selected_flowcharts;
                             if count > 0 {
                                 self.set_status(&format!("{} item(s) selected (drag handles to resize, drag body to move)", count));
+                            } else {
+                                self.clear_selection();
                             }
                         } else {
                             // Single click: hit test cards first, then nearby stroke
@@ -5301,5 +5335,73 @@ mod tests {
         let _ = egui::PointerButton::Middle;
         let _ = egui::PointerButton::Extra1;
         let _ = egui::PointerButton::Extra2;
+    }
+
+    #[test]
+    fn test_point_in_polygon_and_lasso_precision() {
+        let lasso = vec![
+            Pos2::new(100.0, 100.0),
+            Pos2::new(200.0, 100.0),
+            Pos2::new(200.0, 200.0),
+            Pos2::new(100.0, 200.0),
+        ];
+
+        // Points inside
+        assert!(point_in_polygon(Pos2::new(150.0, 150.0), &lasso));
+        assert!(point_in_polygon(Pos2::new(110.0, 110.0), &lasso));
+
+        // Points outside
+        assert!(!point_in_polygon(Pos2::new(50.0, 50.0), &lasso));
+        assert!(!point_in_polygon(Pos2::new(250.0, 150.0), &lasso));
+        assert!(!point_in_polygon(Pos2::new(150.0, 250.0), &lasso));
+
+        // Stroke 1: Fully enclosed in lasso (intended target)
+        let stroke_target: Vec<Pos2> = (0..10).map(|i| Pos2::new(120.0 + i as f32 * 5.0, 150.0)).collect();
+        let inside_count_target = stroke_target.iter().filter(|p| point_in_polygon(**p, &lasso)).count();
+        let ratio_target = inside_count_target as f32 / stroke_target.len() as f32;
+        assert_eq!(ratio_target, 1.0, "Encircled target stroke must have 100% points inside");
+        assert!(ratio_target >= 0.55);
+
+        // Stroke 2: Unrelated stroke passing nearby that only grazes 1 point into the lasso area
+        let stroke_unrelated: Vec<Pos2> = (0..20).map(|i| Pos2::new(195.0 + i as f32 * 5.0, 150.0)).collect();
+        // Only point at index 0 (195.0, 150.0) is inside, the remaining 19 are outside (200.0 .. 290.0)
+        let inside_count_unrelated = stroke_unrelated.iter().filter(|p| point_in_polygon(**p, &lasso)).count();
+        let ratio_unrelated = inside_count_unrelated as f32 / stroke_unrelated.len() as f32;
+        assert_eq!(inside_count_unrelated, 1);
+        assert_eq!(ratio_unrelated, 0.05);
+        assert!(ratio_unrelated < 0.55, "Unrelated grazing stroke (5% inside) must be rejected by precision algorithm");
+    }
+
+    #[test]
+    fn test_card_encircling_filter() {
+        let lasso_bbox = Rect::from_min_max(Pos2::new(100.0, 100.0), Pos2::new(200.0, 200.0));
+        let lasso = vec![
+            Pos2::new(100.0, 100.0),
+            Pos2::new(200.0, 100.0),
+            Pos2::new(200.0, 200.0),
+            Pos2::new(100.0, 200.0),
+        ];
+
+        let card_encircled = |card_rect: Rect, l: &[Pos2], l_bbox: Rect| -> bool {
+            if card_rect.width() > l_bbox.width() * 1.25 || card_rect.height() > l_bbox.height() * 1.25 {
+                return false;
+            }
+            let corners = [
+                card_rect.left_top(),
+                card_rect.right_top(),
+                card_rect.left_bottom(),
+                card_rect.right_bottom(),
+            ];
+            let corners_inside = corners.iter().filter(|c| point_in_polygon(**c, l)).count();
+            corners_inside == 4 || (corners_inside >= 3 && point_in_polygon(card_rect.center(), l))
+        };
+
+        // Case 1: Large table / plot (400x300) near or under a small lasso (100x100)
+        let large_table = Rect::from_min_size(Pos2::new(50.0, 50.0), Vec2::new(400.0, 300.0));
+        assert!(!card_encircled(large_table, &lasso, lasso_bbox), "Large background card must NEVER be selected when lassoing a small note");
+
+        // Case 2: Card deliberately encircled by a larger lasso
+        let small_card = Rect::from_min_size(Pos2::new(120.0, 120.0), Vec2::new(50.0, 50.0));
+        assert!(card_encircled(small_card, &lasso, lasso_bbox), "Card fully surrounded by lasso must be selected");
     }
 }
