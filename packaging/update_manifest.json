@@ -1,9 +1,9 @@
-{
+﻿{
     "version":  "0.1.2",
     "release_date":  "2026-10-25",
     "title":  "Inkk 0.1.2",
-    "release_notes":  "What's new in Inkk v0.1.2:\n- Performance & Zero-Stutter Writing: Non-blocking background autosave eliminates pen freeze, viewport frustum culling accelerates multi-page notebooks\n- Lightweight Previews Drawer: Culls off-screen thumbnails and renders fast vector polylines for instant scrolling\n- Whiteboard-native Flowcharting: Shapes and connecting arrows lie directly on the canvas without popup windows\n- Interactive Anchor Connection Dots: Hover connection dots appear on block edges; clicking an anchor opens quick-picker to auto-connect with an arrow\n- Precision Lasso Selection: Enclosure ratio and centroid filtering to accurately select individual strokes\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window",
+    "release_notes":  "What\u0027s new in Inkk v0.1.2:\n- Ultimate Zero-Lag Handwriting: Dynamic stroke shape caching, Bezier curve step optimization, and redundant ribbon edge elimination completely remove inking hitches\n- Viewport-Clamped Paper Grids: Frustum-culled background ruled lines and dot-grids prevent unnecessary geometry on large pages\n- High-Speed Previews Drawer: Cached page thumbnail shapes eliminate thumbnail re-rendering while writing\n- Non-blocking Background Autosave: Background worker thread saves notebooks without blocking user pen strokes\n- Whiteboard-native Flowcharting: Place and edit flowchart blocks directly on the canvas without dialog popups\n- Interactive Anchor Connection Dots: Hover connection dots appear on block edges; clicking an anchor auto-connects to the next block with an arrow\n- Precision Lasso Selection: Enclosure ratio and centroid filtering to accurately select individual strokes\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window",
     "download_url":  "https://github.com/NTDD-code/inkk-notes/releases/latest",
     "mandatory":  false,
-    "sha256":  "D17C1C5A301B6ACF85EFA4642D1C1322C6D9F40E52489B96E278ABD8E8808151"
+    "sha256":  "F171FA00B2D0CE5BB4216F9ACACD8CD7F29E7A53DE295279DFC8045013538765"
 }

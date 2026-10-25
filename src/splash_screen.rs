@@ -201,13 +201,13 @@ impl SplashScreenState {
                     );
                 }
 
-                // Version text in top-right: e.g. "0.1.2" (clean and minimal)
+                // Version text in top-right: e.g. "v0.1.2" (clean and minimal)
                 let ver_x = card_rect.max.x - 18.0;
                 let ver_y = card_rect.min.y + 14.0;
                 painter.text(
                     Pos2::new(ver_x, ver_y),
                     egui::Align2::RIGHT_TOP,
-                    env!("CARGO_PKG_VERSION"),
+                    format!("v{}", env!("CARGO_PKG_VERSION")),
                     FontId::proportional(12.0),
                     splash_colors::TEXT_MUTED,
                 );

@@ -342,6 +342,13 @@ pub struct InkkApp {
     /// Stencil tools: Straight Ruler & Circular Protractor
     pub ruler: RulerState,
 
+    // Performance shape caching for canvas strokes and thumbnails
+    stroke_shape_cache: HashMap<String, Vec<egui::Shape>>,
+    last_render_scale: f32,
+    last_render_pan: Vec2,
+    last_render_page_idx: usize,
+    thumbnail_shape_cache: HashMap<usize, (usize, bool, Pos2, Vec<egui::Shape>)>,
+
     // TextLayer state
     editing_text_id: Option<String>,
     text_font_size: f32,
@@ -439,6 +446,12 @@ impl Default for InkkApp {
             status_message: None,
             canvas_gesture: false,
             ruler: RulerState::default(),
+
+            stroke_shape_cache: HashMap::new(),
+            last_render_scale: 1.0,
+            last_render_pan: Vec2::ZERO,
+            last_render_page_idx: 0,
+            thumbnail_shape_cache: HashMap::new(),
 
             editing_text_id: None,
             text_font_size: 18.0,
@@ -2230,6 +2243,7 @@ impl InkkApp {
         if idx < self.notebook.pages.len() {
             self.notebook.current_page_index = idx;
             self.clear_selection();
+            self.stroke_shape_cache.clear();
         }
     }
 
@@ -2324,12 +2338,35 @@ impl InkkApp {
                                     &to_thumb,
                                     is_dark,
                                 );
-                                NoteRenderer::render_strokes_thumbnail(
-                                    &painter.with_clip_rect(rect),
-                                    &page.strokes,
-                                    thumb_scale,
-                                    &to_thumb,
-                                );
+                                // High-performance thumbnail shape caching
+                                let clip_painter = painter.with_clip_rect(rect);
+                                let need_rebuild = match self.thumbnail_shape_cache.get(&idx) {
+                                    Some((cached_len, cached_dark, cached_pos, _)) => {
+                                        *cached_len != page.strokes.len()
+                                            || *cached_dark != is_dark
+                                            || (*cached_pos - rect.min).length_sq() > 0.25
+                                    }
+                                    None => true,
+                                };
+
+                                if need_rebuild {
+                                    let shapes = NoteRenderer::render_strokes_thumbnail_to_shapes(
+                                        &page.strokes,
+                                        thumb_scale,
+                                        &to_thumb,
+                                    );
+                                    for s in &shapes {
+                                        clip_painter.add(s.clone());
+                                    }
+                                    self.thumbnail_shape_cache.insert(
+                                        idx,
+                                        (page.strokes.len(), is_dark, rect.min, shapes),
+                                    );
+                                } else if let Some((_, _, _, ref shapes)) = self.thumbnail_shape_cache.get(&idx) {
+                                    for s in shapes {
+                                        clip_painter.add(s.clone());
+                                    }
+                                }
                             }
 
                             let ring = if is_active {
@@ -2425,24 +2462,32 @@ impl InkkApp {
                         if self.notebook.move_page_up(idx) {
                             self.set_status(&format!("Moved page {} earlier to position {}", idx + 1, idx));
                             self.autosave.mark_dirty();
+                            self.thumbnail_shape_cache.clear();
+                            self.stroke_shape_cache.clear();
                         }
                     }
                     Some(PageAction::MoveDown(idx)) => {
                         if self.notebook.move_page_down(idx) {
                             self.set_status(&format!("Moved page {} later to position {}", idx + 1, idx + 2));
                             self.autosave.mark_dirty();
+                            self.thumbnail_shape_cache.clear();
+                            self.stroke_shape_cache.clear();
                         }
                     }
                     Some(PageAction::Duplicate(idx)) => {
                         self.go_to_page(idx);
                         self.notebook.duplicate_current_page();
                         self.set_status(&format!("Duplicated page {}", idx + 1));
+                        self.thumbnail_shape_cache.clear();
+                        self.stroke_shape_cache.clear();
                     }
                     Some(PageAction::Delete(idx)) => {
                         self.go_to_page(idx);
                         self.notebook.delete_current_page();
                         self.clear_selection();
                         self.set_status(&format!("Deleted page {}", idx + 1));
+                        self.thumbnail_shape_cache.clear();
+                        self.stroke_shape_cache.clear();
                     }
                     None => {}
                 }
@@ -2454,6 +2499,8 @@ impl InkkApp {
         if let Some(popped) = page.strokes.pop() {
             self.redo_stack.push(popped);
             self.autosave.mark_dirty();
+            self.stroke_shape_cache.clear();
+            self.thumbnail_shape_cache.clear();
         }
         self.clear_selection();
     }
@@ -2463,6 +2510,8 @@ impl InkkApp {
             let page = self.notebook.current_page_mut();
             page.strokes.push(stroke);
             self.autosave.mark_dirty();
+            self.stroke_shape_cache.clear();
+            self.thumbnail_shape_cache.clear();
         }
         self.clear_selection();
     }
@@ -2729,6 +2778,8 @@ impl InkkApp {
             }
         }
         self.notebook = nb;
+        self.stroke_shape_cache.clear();
+        self.thumbnail_shape_cache.clear();
         self.current_file_path = Some(path.to_path_buf());
         self.clear_selection();
         self.set_status(&format!(
@@ -2893,6 +2944,8 @@ impl InkkApp {
             .retain(|stroke| !stroke_hit_test(stroke, world_pos, radius));
         if page.strokes.len() != old_len {
             self.autosave.mark_dirty();
+            self.stroke_shape_cache.clear();
+            self.thumbnail_shape_cache.clear();
         }
     }
 
@@ -2937,6 +2990,8 @@ impl InkkApp {
 
         page.strokes = new_strokes;
         self.autosave.mark_dirty();
+        self.stroke_shape_cache.clear();
+        self.thumbnail_shape_cache.clear();
     }
 }
 
@@ -3839,6 +3894,17 @@ impl eframe::App for InkkApp {
                     );
                 }
 
+                // Viewport & page invalidation for the dynamic stroke shape cache
+                if self.last_render_scale != scale
+                    || self.last_render_pan != pan
+                    || self.last_render_page_idx != self.notebook.current_page_index
+                {
+                    self.stroke_shape_cache.clear();
+                    self.last_render_scale = scale;
+                    self.last_render_pan = pan;
+                    self.last_render_page_idx = self.notebook.current_page_index;
+                }
+
                 // Layer 1: Highlighters (saved)
                 for stroke in &page.strokes {
                     if stroke.pen_type == PenType::Highlighter {
@@ -3848,7 +3914,12 @@ impl eframe::App for InkkApp {
                                 continue;
                             }
                         }
-                        NoteRenderer::render_single_stroke(&page_painter, stroke, scale, &to_screen);
+                        let shapes = self.stroke_shape_cache.entry(stroke.id.clone()).or_insert_with(|| {
+                            NoteRenderer::render_single_stroke_to_shapes(stroke, scale, &to_screen)
+                        });
+                        for s in shapes {
+                            page_painter.add(s.clone());
+                        }
                     }
                 }
                 // If active stroke is highlighter, render here
@@ -3867,7 +3938,12 @@ impl eframe::App for InkkApp {
                                 continue;
                             }
                         }
-                        NoteRenderer::render_single_stroke(&page_painter, stroke, scale, &to_screen);
+                        let shapes = self.stroke_shape_cache.entry(stroke.id.clone()).or_insert_with(|| {
+                            NoteRenderer::render_single_stroke_to_shapes(stroke, scale, &to_screen)
+                        });
+                        for s in shapes {
+                            page_painter.add(s.clone());
+                        }
                     }
                 }
                 // If active stroke is normal ink, render here
