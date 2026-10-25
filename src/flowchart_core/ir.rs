@@ -155,6 +155,73 @@ impl FlowchartGraph {
             .collect()
     }
 
+    pub fn add_visual_node(&mut self, kind: BlockKind, label: String, pos: (f32, f32)) -> NodeId {
+        let id = NodeId(self.next_node_id);
+        self.next_node_id += 1;
+
+        let (w, h) = match kind {
+            BlockKind::Start | BlockKind::End => (110.0, 42.0),
+            BlockKind::Decision => (130.0, 70.0),
+            BlockKind::Input | BlockKind::Output => (130.0, 50.0),
+            BlockKind::LoopFor | BlockKind::LoopWhile | BlockKind::LoopRepeat => (135.0, 55.0),
+            BlockKind::Connector => (48.0, 48.0),
+            BlockKind::Document => (120.0, 55.0),
+            BlockKind::Database => (100.0, 60.0),
+            _ => (130.0, 50.0),
+        };
+
+        self.nodes.push(FlowNode {
+            id,
+            custom_id: None,
+            kind,
+            label,
+            span: Span::default(),
+            pinned_pos: Some(pos),
+            width: w,
+            height: h,
+        });
+
+        id
+    }
+
+    pub fn remove_node(&mut self, id: NodeId) {
+        self.nodes.retain(|n| n.id != id);
+        self.edges.retain(|e| e.from != id && e.to != id);
+    }
+
+    pub fn remove_edge(&mut self, edge_id: usize) {
+        self.edges.retain(|e| e.id != edge_id);
+    }
+
+    pub fn compute_bounds(&self) -> (f32, f32, f32, f32) {
+        if self.nodes.is_empty() {
+            return (0.0, 0.0, 400.0, 300.0);
+        }
+        let mut min_x = f32::MAX;
+        let mut min_y = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut max_y = f32::MIN;
+
+        for node in &self.nodes {
+            let (nx, ny) = node.pinned_pos.unwrap_or((60.0, 60.0));
+            min_x = min_x.min(nx);
+            min_y = min_y.min(ny);
+            max_x = max_x.max(nx + node.width);
+            max_y = max_y.max(ny + node.height);
+        }
+
+        (min_x, min_y, max_x, max_y)
+    }
+
+    pub fn shift_all_nodes(&mut self, dx: f32, dy: f32) {
+        for node in &mut self.nodes {
+            if let Some(ref mut pos) = node.pinned_pos {
+                pos.0 += dx;
+                pos.1 += dy;
+            }
+        }
+    }
+
     pub fn from_ast(ast: &FlowchartAst) -> Self {
         let builder = GraphBuilder::new();
         builder.build(ast)
@@ -597,7 +664,7 @@ impl GraphBuilder {
             AstStmt::ErrorRecovery { raw_text, span, .. } => {
                 let id =
                     self.graph
-                        .alloc_node(BlockKind::Process, format!("⚠️ {}", raw_text), *span);
+                        .alloc_node(BlockKind::Process, format!("[!] {}", raw_text), *span);
                 (Some(id), vec![(id, PortSide::Bottom, None)])
             }
         }

@@ -415,4 +415,72 @@ end
         assert!(mermaid.starts_with("graph TD"));
         assert!(mermaid.contains("-->"));
     }
+
+    #[test]
+    fn test_22_interactive_visual_node_placement_and_connection() {
+        use crate::flowchart_core::ir::PortSide;
+
+        let mut graph = FlowchartGraph::new();
+
+        // 1. User clicks "Start" (Oval) in shapes menu
+        let start_id = graph.add_visual_node(BlockKind::Start, "Start".to_string(), (60.0, 60.0));
+        assert_eq!(graph.nodes.len(), 1);
+
+        // 2. User clicks right anchor dot of Start -> selects Decision (Diamond)
+        let decision_id = graph.add_visual_node(
+            BlockKind::Decision,
+            "Is Valid?".to_string(),
+            (240.0, 60.0),
+        );
+        let e1 = graph.add_edge(start_id, PortSide::Right, decision_id, PortSide::Left, None);
+        assert_eq!(e1, 1);
+
+        // 3. User clicks bottom anchor dot of Decision -> selects Process (Rectangle)
+        let process_id = graph.add_visual_node(
+            BlockKind::Process,
+            "Process Data".to_string(),
+            (240.0, 190.0),
+        );
+        let e2 = graph.add_edge(decision_id, PortSide::Bottom, process_id, PortSide::Top, None);
+        assert_eq!(e2, 2);
+
+        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(graph.edges.len(), 2);
+
+        let (min_x, min_y, max_x, max_y) = graph.compute_bounds();
+        assert_eq!(min_x, 60.0);
+        assert_eq!(min_y, 60.0);
+        assert!(max_x >= 240.0 + 130.0);
+        assert!(max_y >= 190.0 + 50.0);
+    }
+
+    #[test]
+    fn test_23_visual_node_deletion_and_edge_cleanup() {
+        use crate::flowchart_core::ir::PortSide;
+
+        let mut graph = FlowchartGraph::new();
+        let n1 = graph.add_visual_node(BlockKind::Start, "Start".into(), (50.0, 50.0));
+        let n2 = graph.add_visual_node(BlockKind::Process, "Step".into(), (200.0, 50.0));
+        let n3 = graph.add_visual_node(BlockKind::End, "End".into(), (350.0, 50.0));
+
+        graph.add_edge(n1, PortSide::Right, n2, PortSide::Left, None);
+        graph.add_edge(n2, PortSide::Right, n3, PortSide::Left, None);
+        assert_eq!(graph.edges.len(), 2);
+
+        // Deleting n2 must delete both connected edges!
+        graph.remove_node(n2);
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.edges.len(), 0);
+    }
+
+    #[test]
+    fn test_24_graph_shift_all_nodes() {
+        let mut graph = FlowchartGraph::new();
+        graph.add_visual_node(BlockKind::Start, "Start".into(), (10.0, 20.0));
+        graph.add_visual_node(BlockKind::End, "End".into(), (100.0, 200.0));
+
+        graph.shift_all_nodes(50.0, 30.0);
+        assert_eq!(graph.nodes[0].pinned_pos, Some((60.0, 50.0)));
+        assert_eq!(graph.nodes[1].pinned_pos, Some((150.0, 230.0)));
+    }
 }

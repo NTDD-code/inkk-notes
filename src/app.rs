@@ -296,8 +296,9 @@ pub struct InkkApp {
     pub axes_dialog: crate::ui_dialogs::AxesDialogState,
     pub table_dialog: crate::ui_dialogs::TableDialogState,
 
-    // Flowchart Studio & Engine
+    // Flowchart Studio & Interactive Builder
     pub flowchart_editor: crate::flowchart_ui::FlowchartEditorState,
+    pub flowchart_state: crate::flowchart_ui::FlowchartUiState,
 
 
     // Splash screen & Photoshop-style startup cover (bia.png)
@@ -416,6 +417,7 @@ impl Default for InkkApp {
             axes_dialog: crate::ui_dialogs::AxesDialogState::default(),
             table_dialog: crate::ui_dialogs::TableDialogState::default(),
             flowchart_editor: crate::flowchart_ui::FlowchartEditorState::default(),
+            flowchart_state: crate::flowchart_ui::FlowchartUiState::default(),
             splash_screen: crate::splash_screen::SplashScreenState::default(),
             shortcut_manager: crate::shortcuts::ShortcutManager::new(),
             shortcuts_dialog: crate::shortcuts::ShortcutsDialogState::default(),
@@ -1770,22 +1772,22 @@ impl InkkApp {
                 {
                     self.table_dialog.open_new();
                 }
-                let flowchart_active = self.flowchart_editor.is_open;
+                let flowchart_active = self.flowchart_state.is_panel_open || self.flowchart_editor.is_open;
                 if widgets::tool_button(
                     ui,
                     &p,
                     VectorIcon::Flowchart,
                     flowchart_active,
-                    "Flowchart Studio & Algorithm Editor (Ctrl+F)",
+                    "Flowchart Shapes Menu & Builder (Ctrl+F)",
                 )
                 .clicked()
                 {
-                    self.flowchart_editor.toggle();
-                    let is_on = self.flowchart_editor.is_open;
+                    self.flowchart_state.is_panel_open = !self.flowchart_state.is_panel_open;
+                    let is_on = self.flowchart_state.is_panel_open;
                     self.set_status(if is_on {
-                        "Flowchart Studio OPEN"
+                        "Flowchart Shapes Menu OPEN"
                     } else {
-                        "Flowchart Studio CLOSED"
+                        "Flowchart Shapes Menu CLOSED"
                     });
                 }
             });
@@ -3249,12 +3251,12 @@ impl InkkApp {
 
         let ctrl_f = pressed(Modifiers::COMMAND, Key::F);
         if self.shortcut_manager.is_triggered(ctx, "studio_flowchart") || ctrl_f {
-            self.flowchart_editor.toggle();
-            let is_on = self.flowchart_editor.is_open;
+            self.flowchart_state.is_panel_open = !self.flowchart_state.is_panel_open;
+            let is_on = self.flowchart_state.is_panel_open;
             self.set_status(if is_on {
-                "Flowchart Studio OPEN"
+                "Flowchart Shapes Menu OPEN"
             } else {
-                "Flowchart Studio CLOSED"
+                "Flowchart Shapes Menu CLOSED"
             });
         }
 
@@ -3624,6 +3626,31 @@ impl eframe::App for InkkApp {
 
 
 
+        // Flowchart Left Shapes Sidebar Panel
+        let view_center_world = self.to_world(Pos2::new(available_size.x * 0.5, available_size.y * 0.5));
+        let mut open_flow_editor = false;
+        let mut req_bake_flow_svg = None;
+        let is_dark_mode = self.is_dark_mode;
+        crate::flowchart_ui::FlowchartPalette::render_side_panel(
+            ctx,
+            &mut self.flowchart_state,
+            self.notebook.current_page_mut(),
+            &p,
+            is_dark_mode,
+            &mut open_flow_editor,
+            &mut req_bake_flow_svg,
+            view_center_world,
+        );
+        if open_flow_editor {
+            self.flowchart_editor.is_open = true;
+        }
+        if let Some(svg) = req_bake_flow_svg {
+            if let Some((img_bytes, w, h)) = Self::decode_image_or_svg(svg.as_bytes()) {
+                self.insert_image_bytes(img_bytes, w, h);
+                self.set_status("Flowchart converted and placed on whiteboard as an image!");
+            }
+        }
+
         self.render_previews_drawer(ctx);
 
         self.handle_shortcuts(ctx, available_size);
@@ -3779,16 +3806,21 @@ impl eframe::App for InkkApp {
                 }
 
                 // Layer 0.4: Flowchart Entities
+                let hover_cursor_pos = ui.input(|i| i.pointer.hover_pos());
                 for flow in &page.flowcharts {
-                    let is_sel = self.selected_flowchart_ids.contains(&flow.id);
+                    let is_sel = self.selected_flowchart_ids.contains(&flow.id)
+                        || self.flowchart_state.active_flowchart_id.as_deref() == Some(&flow.id);
                     crate::flowchart_ui::FlowchartRenderer::render(
                         &page_painter,
+                        ui,
                         flow,
+                        &mut self.flowchart_state,
                         scale,
                         &to_screen,
                         &p,
                         is_dark,
                         is_sel,
+                        hover_cursor_pos,
                     );
                 }
 
@@ -4150,13 +4182,15 @@ impl eframe::App for InkkApp {
                         let effective_cursor = self.ruler.snap_point(cursor).unwrap_or(cursor);
                         let world = self.to_world(effective_cursor);
 
-                        // Check if user clicked on the '✕' close button or '✏' edit button of any plot, matrix, or table grid
+                        // Check if user clicked on the '✕' close button or '✏' edit button of any plot, matrix, table grid, or flowchart
                         let mut delete_plot_idx = None;
                         let mut delete_mat_idx = None;
                         let mut delete_grid_idx = None;
+                        let mut delete_flow_idx = None;
                         let mut edit_plot_idx = None;
                         let mut edit_mat_idx = None;
                         let mut edit_grid_idx = None;
+                        let mut edit_flow_idx = None;
                         {
                             let page = self.notebook.current_page();
                             let scale = self.scale;
@@ -4219,6 +4253,26 @@ impl eframe::App for InkkApp {
                                     }
                                 }
                             }
+                            // 4. Flowchart close and edit button
+                            if delete_plot_idx.is_none() && edit_plot_idx.is_none() && delete_mat_idx.is_none() && edit_mat_idx.is_none() && delete_grid_idx.is_none() && edit_grid_idx.is_none() {
+                                for (idx, flow) in page.flowcharts.iter().enumerate() {
+                                    let card_min = self.to_screen(Pos2::new(flow.x, flow.y));
+                                    let card_size = Vec2::new(flow.width * scale, flow.height * scale);
+                                    let card_rect = Rect::from_min_size(card_min, card_size);
+                                    let header_h = (28.0 * scale).clamp(24.0, 36.0);
+                                    let close_center = card_rect.right_top() + Vec2::new(-14.0 * scale, header_h * 0.5);
+                                    let edit_btn_w = 46.0 * scale;
+                                    let edit_center = card_rect.right_top() + Vec2::new(-edit_btn_w * 0.5 - 32.0 * scale, header_h * 0.5);
+                                    if cursor.distance(close_center) <= (14.0 * scale).max(14.0) {
+                                        delete_flow_idx = Some(idx);
+                                        break;
+                                    }
+                                    if cursor.distance(edit_center) <= (22.0 * scale).max(16.0) {
+                                        edit_flow_idx = Some(idx);
+                                        break;
+                                    }
+                                }
+                            }
                         }
 
                         if let Some(idx) = edit_plot_idx {
@@ -4230,6 +4284,9 @@ impl eframe::App for InkkApp {
                         } else if let Some(idx) = edit_grid_idx {
                             let grid = self.notebook.current_page().grids[idx].clone();
                             self.table_dialog.open_edit(&grid);
+                        } else if let Some(idx) = edit_flow_idx {
+                            let flow = self.notebook.current_page().flowcharts[idx].clone();
+                            self.flowchart_editor.open_for_entity(&flow);
                         } else if let Some(idx) = delete_plot_idx {
                             self.notebook.current_page_mut().plots.remove(idx);
                             self.clear_selection();
@@ -4242,6 +4299,21 @@ impl eframe::App for InkkApp {
                             self.notebook.current_page_mut().grids.remove(idx);
                             self.clear_selection();
                             self.set_status("Deleted table");
+                        } else if let Some(idx) = delete_flow_idx {
+                            self.notebook.current_page_mut().flowcharts.remove(idx);
+                            self.clear_selection();
+                            self.set_status("Deleted flowchart");
+                        } else if let Some((port_node, port_side)) = self.flowchart_state.hovered_port {
+                            // User clicked an anchor connection dot!
+                            self.flowchart_state.active_port_menu = Some((port_node, port_side, cursor));
+                            self.flowchart_state.selected_node_id = Some(port_node);
+                            self.canvas_gesture = false;
+                        } else if let Some(hit_node) = self.flowchart_state.hovered_node_id {
+                            // User clicked on a flowchart node body!
+                            self.flowchart_state.selected_node_id = Some(hit_node);
+                            self.flowchart_state.dragging_node = Some((hit_node, world));
+                            self.flowchart_state.active_port_menu = None;
+                            self.canvas_gesture = false;
                         } else {
                             match self.tool {
                             ToolMode::Pan => {}
@@ -4916,6 +4988,72 @@ impl eframe::App for InkkApp {
                 let mut action_move_page_down = false;
                 let mut action_center_page = false;
                 let mut action_set_tool = None;
+                // 1. Flowchart Node Dragging
+                if let Some((drag_node_id, drag_start_world)) = self.flowchart_state.dragging_node {
+                    if pointer.primary_down() {
+                        if let Some(cursor) = pointer_pos {
+                            let world = self.to_world(cursor);
+                            let delta = world - drag_start_world;
+                            self.flowchart_state.dragging_node = Some((drag_node_id, world));
+                            let page_mut = self.notebook.current_page_mut();
+                            for flow in &mut page_mut.flowcharts {
+                                if let Some(graph) = &mut flow.graph {
+                                    if let Some(n) = graph.node_mut(drag_node_id) {
+                                        if let Some(ref mut pin) = n.pinned_pos {
+                                            pin.0 = (pin.0 + delta.x).max(10.0);
+                                            pin.1 = (pin.1 + delta.y).max(10.0);
+                                        }
+                                        let (_, _, max_x, max_y) = graph.compute_bounds();
+                                        flow.width = (max_x + 60.0).max(400.0);
+                                        flow.height = (max_y + 60.0).max(300.0);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        self.flowchart_state.dragging_node = None;
+                    }
+                }
+
+                // 2. Flowchart Keyboard Delete
+                let key_del = ui.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace));
+                if key_del && self.flowchart_state.selected_node_id.is_some() && self.editing_text_id.is_none() {
+                    let sel_id = self.flowchart_state.selected_node_id.take().unwrap();
+                    let page_mut = self.notebook.current_page_mut();
+                    for flow in &mut page_mut.flowcharts {
+                        if let Some(graph) = &mut flow.graph {
+                            graph.remove_node(sel_id);
+                        }
+                    }
+                    self.set_status("Deleted flowchart block");
+                }
+
+                // 3. Flowchart "Add Next Block" Quick Picker Popover
+                if self.flowchart_state.active_port_menu.is_some() {
+                    let page_mut = self.notebook.current_page_mut();
+                    let active_fid = self.flowchart_state.active_flowchart_id.clone();
+                    if let Some(fid) = active_fid {
+                        if let Some(flow) = page_mut.flowcharts.iter_mut().find(|f| f.id == fid) {
+                            crate::flowchart_ui::FlowchartRenderer::handle_popover_and_actions(
+                                ui,
+                                flow,
+                                &mut self.flowchart_state,
+                                &p,
+                                is_dark,
+                            );
+                        }
+                    } else if let Some(flow) = page_mut.flowcharts.first_mut() {
+                        crate::flowchart_ui::FlowchartRenderer::handle_popover_and_actions(
+                            ui,
+                            flow,
+                            &mut self.flowchart_state,
+                            &p,
+                            is_dark,
+                        );
+                    }
+                }
+
                 let mut action_toggle_math = false;
                 let mut action_toggle_ruler = false;
                 let mut action_toggle_protractor = false;

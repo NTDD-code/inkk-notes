@@ -56,6 +56,14 @@ pub const SHAPE_PENTAGON_PATH: &str = "M12 4L19.5 9.5L16.5 19.5H7.5L4.5 9.5Z";
 pub const SHAPE_HEXAGON_PATH: &str = "M12 4L19 8V16L12 20L5 16V8Z";
 pub const SHAPE_STAR_PATH: &str =
     "M12 3.5L14.6 8.8L20.5 9.6L16.2 13.8L17.2 19.6L12 16.8L6.8 19.6L7.8 13.8L3.5 9.6L9.4 8.8Z";
+pub const SHAPE_DIAMOND_PATH: &str = "M12 3L21 12L12 21L3 12Z";
+pub const SHAPE_OVAL_PATH: &str =
+    "M7 6H17C19.8 6 22 8.7 22 12C22 15.3 19.8 18 17 18H7C4.2 18 2 15.3 2 12C2 8.7 4.2 6 7 6Z";
+pub const SHAPE_PARALLELOGRAM_PATH: &str = "M6 19L10 5H21L17 19H6Z";
+pub const SHAPE_SUBROUTINE_PATH: &str = "M3 5H21V19H3Z M7 5V19 M17 5V19";
+pub const SHAPE_DATABASE_PATH: &str =
+    "M4 6C4 3.8 7.6 2 12 2C16.4 2 20 3.8 20 6V18C20 20.2 16.4 22 12 22C7.6 22 4 20.2 4 18V6Z M4 10C4 12.2 7.6 14 12 14C16.4 14 20 12.2 20 10 M4 14C4 16.2 7.6 18 12 18C16.4 18 20 16.2 20 14";
+pub const SHAPE_DOCUMENT_PATH: &str = "M4 4H20V17C18 15.5 14 15.5 12 17C10 18.5 6 18.5 4 17V4Z";
 
 // Graph Coordinate Axes vector paths (24x24 viewBox)
 pub const GRAPH_QUADRANT1_PATH: &str =
@@ -163,10 +171,16 @@ pub enum VectorIcon {
     ShapeCube3D,
     ShapePyramid3D,
     ShapeSphere3D,
+    ShapeDiamond,
+    ShapeOval,
+    ShapeParallelogram,
+    ShapeSubroutine,
+    ShapeDatabase,
+    ShapeDocument,
 }
 
 impl VectorIcon {
-    pub const ALL: [VectorIcon; 52] = [
+    pub const ALL: [VectorIcon; 58] = [
         VectorIcon::Library,
         VectorIcon::Save,
         VectorIcon::Pages,
@@ -219,6 +233,12 @@ impl VectorIcon {
         VectorIcon::ShapeCube3D,
         VectorIcon::ShapePyramid3D,
         VectorIcon::ShapeSphere3D,
+        VectorIcon::ShapeDiamond,
+        VectorIcon::ShapeOval,
+        VectorIcon::ShapeParallelogram,
+        VectorIcon::ShapeSubroutine,
+        VectorIcon::ShapeDatabase,
+        VectorIcon::ShapeDocument,
     ];
 
     pub fn raw_svg(&self) -> &'static str {
@@ -275,6 +295,12 @@ impl VectorIcon {
             VectorIcon::ShapeCube3D => SHAPE_CUBE_3D_PATH,
             VectorIcon::ShapePyramid3D => SHAPE_PYRAMID_3D_PATH,
             VectorIcon::ShapeSphere3D => SHAPE_SPHERE_3D_PATH,
+            VectorIcon::ShapeDiamond => SHAPE_DIAMOND_PATH,
+            VectorIcon::ShapeOval => SHAPE_OVAL_PATH,
+            VectorIcon::ShapeParallelogram => SHAPE_PARALLELOGRAM_PATH,
+            VectorIcon::ShapeSubroutine => SHAPE_SUBROUTINE_PATH,
+            VectorIcon::ShapeDatabase => SHAPE_DATABASE_PATH,
+            VectorIcon::ShapeDocument => SHAPE_DOCUMENT_PATH,
         }
     }
 
@@ -332,6 +358,12 @@ impl VectorIcon {
             VectorIcon::ShapeCube3D => "3D Cube",
             VectorIcon::ShapePyramid3D => "3D Pyramid",
             VectorIcon::ShapeSphere3D => "3D Sphere",
+            VectorIcon::ShapeDiamond => "Decision (Diamond)",
+            VectorIcon::ShapeOval => "Terminator (Oval)",
+            VectorIcon::ShapeParallelogram => "Data (Parallelogram)",
+            VectorIcon::ShapeSubroutine => "Subroutine",
+            VectorIcon::ShapeDatabase => "Database",
+            VectorIcon::ShapeDocument => "Document",
         }
     }
 
@@ -389,6 +421,12 @@ impl VectorIcon {
             VectorIcon::ShapeCube3D => "Draw 3D Cube (with hidden edges)",
             VectorIcon::ShapePyramid3D => "Draw 3D Pyramid (with hidden edges)",
             VectorIcon::ShapeSphere3D => "Draw 3D Sphere (with latitude/longitude)",
+            VectorIcon::ShapeDiamond => "Insert Flowchart Decision block (Diamond)",
+            VectorIcon::ShapeOval => "Insert Flowchart Terminator block (Oval/Pill)",
+            VectorIcon::ShapeParallelogram => "Insert Flowchart Data I/O block (Parallelogram)",
+            VectorIcon::ShapeSubroutine => "Insert Flowchart Subroutine block",
+            VectorIcon::ShapeDatabase => "Insert Flowchart Database entity",
+            VectorIcon::ShapeDocument => "Insert Flowchart Document entity",
         }
     }
 
@@ -601,6 +639,30 @@ impl VectorIcon {
             VectorIcon::ShapeSphere3D => {
                 static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
                 CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_SPHERE_3D_PATH))
+            }
+            VectorIcon::ShapeDiamond => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_DIAMOND_PATH))
+            }
+            VectorIcon::ShapeOval => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_OVAL_PATH))
+            }
+            VectorIcon::ShapeParallelogram => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_PARALLELOGRAM_PATH))
+            }
+            VectorIcon::ShapeSubroutine => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_SUBROUTINE_PATH))
+            }
+            VectorIcon::ShapeDatabase => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_DATABASE_PATH))
+            }
+            VectorIcon::ShapeDocument => {
+                static CACHE: OnceLock<ParsedSvg> = OnceLock::new();
+                CACHE.get_or_init(|| ParsedSvg::parse(SHAPE_DOCUMENT_PATH))
             }
         }
     }
@@ -931,7 +993,7 @@ mod tests {
 
     #[test]
     fn test_all_ten_icons_parse() {
-        assert_eq!(VectorIcon::ALL.len(), 52);
+        assert_eq!(VectorIcon::ALL.len(), 58);
         for icon in VectorIcon::ALL {
             let parsed = icon.parsed();
             let total_geometry = parsed.rects.len() + parsed.subpaths.len();

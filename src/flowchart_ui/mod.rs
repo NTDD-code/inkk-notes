@@ -6,4 +6,4 @@ pub mod palette;
 
 pub use canvas_renderer::FlowchartRenderer;
 pub use editor_panel::FlowchartEditorState;
-pub use palette::FlowchartPalette;
+pub use palette::{FlowchartPalette, FlowchartUiState};

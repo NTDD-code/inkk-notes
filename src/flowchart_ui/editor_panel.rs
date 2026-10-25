@@ -103,9 +103,9 @@ impl FlowchartEditorState {
 
         let mut is_open_flag = self.is_open;
         let window_title = if self.editing_entity_id.is_some() {
-            "⚡ Flowchart Studio — Edit Entity"
+            "Flowchart Studio - Edit Entity"
         } else {
-            "⚡ Flowchart Studio"
+            "Flowchart Studio"
         };
 
         egui::Window::new(window_title)
@@ -151,7 +151,7 @@ impl FlowchartEditorState {
             ui.separator();
 
             // Format DSL canonical button
-            if ui.button("⚡ Format DSL").clicked() {
+            if ui.button("Format DSL").clicked() {
                 let (ast, _) = Parser::from_str(&self.dsl_buffer).parse();
                 self.dsl_buffer = format_dsl(&ast);
                 self.recompile();
@@ -159,7 +159,7 @@ impl FlowchartEditorState {
             }
 
             // Copy Mermaid
-            if ui.button("📋 Copy Mermaid").clicked() {
+            if ui.button("Copy Mermaid").clicked() {
                 if let Some(graph) = &self.preview_graph {
                     let mermaid = FlowchartExporter::to_mermaid(graph);
                     ui.output_mut(|o| o.copied_text = mermaid);
@@ -168,7 +168,7 @@ impl FlowchartEditorState {
             }
 
             // Copy SVG
-            if ui.button("📋 Copy SVG").clicked() {
+            if ui.button("Copy SVG").clicked() {
                 if let Some(graph) = &self.preview_graph {
                     let svg = FlowchartExporter::to_svg(graph, None, None);
                     ui.output_mut(|o| o.copied_text = svg);
@@ -177,7 +177,7 @@ impl FlowchartEditorState {
             }
 
             // Save SVG file to disk
-            if ui.button("💾 Save SVG...").on_hover_text("Save this flowchart as an .svg vector file to disk").clicked() {
+            if ui.button("Save SVG...").on_hover_text("Save this flowchart as an .svg vector file to disk").clicked() {
                 self.recompile();
                 if let Some(graph) = &self.preview_graph {
                     let svg = FlowchartExporter::to_svg(graph, None, None);
@@ -186,7 +186,7 @@ impl FlowchartEditorState {
             }
 
             // Bake directly to whiteboard image
-            if ui.button("🖼 Bake to Whiteboard Image").on_hover_text("Render this flowchart directly onto the whiteboard canvas as a movable vector image").clicked() {
+            if ui.button("Bake to Whiteboard Image").on_hover_text("Render this flowchart directly onto the whiteboard canvas as a movable vector image").clicked() {
                 self.recompile();
                 if let Some(graph) = &self.preview_graph {
                     let svg = FlowchartExporter::to_svg(graph, None, None);
@@ -196,9 +196,9 @@ impl FlowchartEditorState {
 
             // Sync to canvas button
             let apply_lbl = if self.editing_entity_id.is_some() {
-                "💾 Apply to Canvas"
+                "Apply to Canvas"
             } else {
-                "➕ Insert New Flowchart"
+                "Insert New Flowchart"
             };
 
             if ui.button(egui::RichText::new(apply_lbl).color(palette.on_accent).strong()).clicked() {
@@ -260,7 +260,7 @@ impl FlowchartEditorState {
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new("Diagnostics:").strong());
                     if err_count == 0 && warn_count == 0 {
-                        ui.label(egui::RichText::new("✓ Valid Flowchart").color(palette.success));
+                        ui.label(egui::RichText::new("[Valid] ISO 5807 Compliant").color(palette.success));
                     } else {
                         if err_count > 0 {
                             ui.label(egui::RichText::new(format!("{} error(s)", err_count)).color(palette.danger));
@@ -293,7 +293,7 @@ impl FlowchartEditorState {
                                     });
                                     ui.label(&diag.message);
                                     if let Some(help) = &diag.help {
-                                        ui.colored_label(palette.accent, format!("💡 Help: {}", help));
+                                        ui.colored_label(palette.accent, format!("Help: {}", help));
                                     }
                                 });
                             }
