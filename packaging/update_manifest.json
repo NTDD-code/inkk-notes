@@ -5,5 +5,5 @@
     "release_notes":  "Welcome to Inkk!\n- Copy \u0026 Paste handwriting strokes and canvas objects (Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+D)\n- Move \u0026 reorder pages with dedicated controls and shortcuts (Alt+Up / Alt+Down)\n- Whiteboard space-pan: Hold Space and drag to navigate whiteboard view freely\n- Select All (Ctrl+A) and quick context menu actions",
     "download_url":  "https://github.com/NTDD-code/inkk-notes/releases/latest",
     "mandatory":  false,
-    "sha256":  "450C5511C9944AEAD5E0367AC0784268D96A6F9EDA559565C4C33BF52A00EFCD"
+    "sha256":  "BC8D818A23478598957862AAE8D61253885E5627F50694256D8974B1B4F10949"
 }

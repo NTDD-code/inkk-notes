@@ -416,10 +416,15 @@ fn fetch_update_manifest(url: &str) -> Result<UpdateManifest, String> {
     }
 
     // Use Windows built-in curl.exe with timeout
-    let output = std::process::Command::new("curl")
-        .args(["-s", "-L", "--max-time", "8", url])
-        .output()
-        .map_err(|e| format!("curl execution error: {}", e))?;
+    let mut cmd = std::process::Command::new("curl");
+    cmd.args(["-s", "-L", "--max-time", "8", url]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = cmd.output().map_err(|e| format!("curl execution error: {}", e))?;
 
     if !output.status.success() {
         return Err(format!("Server returned error code {:?}", output.status.code()));
@@ -452,9 +457,12 @@ pub fn is_newer(remote: &str, current: &str) -> bool {
 pub fn open_browser(url: &str) {
     #[cfg(target_os = "windows")]
     {
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", "start", "", url])
-            .spawn();
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.args(["/c", "start", "", url]);
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        let _ = cmd.spawn();
     }
     #[cfg(not(target_os = "windows"))]
     {
