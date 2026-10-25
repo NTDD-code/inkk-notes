@@ -1,9 +1,9 @@
 ﻿{
-    "version":  "0.1.1",
-    "release_date":  "2026-10-24",
-    "title":  "Inkk 0.1.1",
-    "release_notes":  "Welcome to Inkk!\n- Copy \u0026 Paste handwriting strokes and canvas objects (Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+D)\n- Move \u0026 reorder pages with dedicated controls and shortcuts (Alt+Up / Alt+Down)\n- Whiteboard space-pan: Hold Space and drag to navigate whiteboard view freely\n- Select All (Ctrl+A) and quick context menu actions",
+    "version":  "0.1.2",
+    "release_date":  "2026-10-25",
+    "title":  "Inkk 0.1.2",
+    "release_notes":  "What\u0027s new in Inkk v0.1.2:\n- Precision Lasso selection: Enclosure ratio and centroid filtering to accurately select individual strokes without grabbing nearby strokes or background cards\n- Clean launch: Set Windows GUI subsystem to permanently eliminate the background command prompt (cmd) window\n- Auto-update alert: Automatically displays update modal when a newer version is available\n- Splash screen version indicator: Displays current version dynamically",
     "download_url":  "https://github.com/NTDD-code/inkk-notes/releases/latest",
     "mandatory":  false,
-    "sha256":  "89AAEE2E7A4218230DC21953AD31F719DE8579D4E5A871762987B536D2C63A18"
+    "sha256":  "6186D356749104355F8CA19628880DD44C0EB05FD73AFA137A0B123C050487E3"
 }

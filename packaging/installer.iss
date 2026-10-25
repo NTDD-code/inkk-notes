@@ -1,6 +1,6 @@
 ; Inkk Professional Windows Installer Script (Inno Setup)
 #define MyAppName "Inkk"
-#define MyAppVersion "0.1.1"
+#define MyAppVersion "0.1.2"
 #define MyAppPublisher "NTDD-code"
 #define MyAppURL "https://github.com/NTDD-code/inkk-notes"
 #define MyAppExeName "inkk.exe"

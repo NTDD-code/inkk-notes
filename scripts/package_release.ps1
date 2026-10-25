@@ -94,7 +94,7 @@ $SetupExePath = $null
 if ($IsccPath) {
     Write-Host "Found Inno Setup Compiler at: $IsccPath" -ForegroundColor Gray
     $IssScript = Join-Path $ProjectRoot "packaging\installer.iss"
-    & $IsccPath $IssScript
+    & $IsccPath "/DMyAppVersion=$Version" $IssScript
     $SetupExePath = Join-Path $DistRoot "Inkk-v$Version-Setup.exe"
 } else {
     Write-Warning "Inno Setup (ISCC.exe) not found. Skipping .exe installer generation."
